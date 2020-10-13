@@ -22,6 +22,14 @@
         <hr />
     </LayoutHeader>
     <LayoutContent Margin="Margin.Is3">
+        <Button Clicked="@(()=>incomingCallModal.Show())">Test</Button>
+
+        <Snackbar @ref="popup" Color="SnackbarColor.Danger" Location="SnackbarLocation.Right" Interval="5000">
+            <SnackbarBody>
+                @popupMessage
+            </SnackbarBody>
+        </Snackbar>
+
         <Modal @ref="userNameModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
             <ModalBackdrop />
             <ModalContent Centered="true">
@@ -36,6 +44,20 @@
                 </ModalFooter>
             </ModalContent>
         </Modal>
+
+        <Modal @ref="incomingCallModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
+            <ModalBackdrop />
+            <ModalContent Centered="true">
+                <ModalBody>
+                    User @callingUserName is calling you. Do you want to accept the call?
+                </ModalBody>
+                <ModalFooter>
+                    <Button Color="Color.Secondary" Clicked="DeclineCall">Decline</Button>
+                    <Button Color="Color.Success" Clicked="AcceptCall">Accept</Button>
+                </ModalFooter>
+            </ModalContent>
+        </Modal>
+
         <div style="display: @(errorAlert ? "block" : "none")">
             <Alert Color="Color.Danger" Visible="true">
                 <AlertMessage>Error!</AlertMessage>
@@ -60,6 +82,10 @@
                             {
                                 <div>
                                     <Icon Name="IconName.User" Margin="Margin.Is1"></Icon> @user.Name
+                                    @if (user.Name != userName)
+                                    {
+                                        <Button Clicked="() => Call(user)" Margin="Margin.Is1" Color="Color.Primary" Size="ButtonSize.Small">Call</Button>
+                                    }
                                 </div>
                             }
                         </CardText>
@@ -91,13 +117,15 @@
 </Layout>
 
 @code {
-    Modal userNameModal;
-    string userName;
+    Snackbar popup;
+    Modal userNameModal, incomingCallModal;
+    string userName, callingUserName;
     List<User> usersList = new List<User>();
     bool errorAlert;
     bool deviceAccessAlert = true;
 
     string errorMessage;
+    string popupMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -147,11 +175,33 @@
         await BrowserService.AttachLocalMedia();
     }
 
+    void AcceptCall()
+    {
+        incomingCallModal.Hide();
+    }
+
+    void DeclineCall()
+    {
+        incomingCallModal.Hide();
+        ShowPopup("Call declined");
+    }
+
     void ShowError(string message)
     {
         errorMessage = message;
         errorAlert = true;
         deviceAccessAlert = false;
+    }
+
+    void ShowPopup(string message)
+    {
+        popupMessage = message;
+        popup.Show();
+    }
+
+    void Call(User user)
+    {
+
     }
 
     public void Dispose()
