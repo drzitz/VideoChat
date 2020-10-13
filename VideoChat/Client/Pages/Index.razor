@@ -1,0 +1,161 @@
+﻿@page "/"
+@inject HubService HubService
+@inject BrowserService BrowserService
+@implements IDisposable
+
+<Layout>
+    <LayoutHeader>
+        <Bar Breakpoint="Breakpoint.Desktop" Background="Background.Light">
+            <BarBrand>Video Chat</BarBrand>
+            <BarMenu>
+                <BarStart>Hub: @HubService.State</BarStart>
+                <BarEnd>
+                    @if (!string.IsNullOrEmpty(userName))
+                    {
+                        <BarItem @onclick="() => userNameModal.Show()">
+                            <Icon Name="IconName.User" Margin="Margin.Is1"></Icon>@userName
+                        </BarItem>
+                    }
+                </BarEnd>
+            </BarMenu>
+        </Bar>
+        <hr />
+    </LayoutHeader>
+    <LayoutContent Margin="Margin.Is3">
+        <Modal @ref="userNameModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
+            <ModalBackdrop />
+            <ModalContent Centered="true">
+                <ModalHeader>Enter your name under which the other users will see you</ModalHeader>
+                <ModalBody>
+                    <Field>
+                        <TextEdit @bind-Text="@userName" Placeholder="Name" />
+                    </Field>
+                </ModalBody>
+                <ModalFooter>
+                    <Button Disabled="string.IsNullOrEmpty(userName)" Color="Color.Primary" Clicked="Start">Start</Button>
+                </ModalFooter>
+            </ModalContent>
+        </Modal>
+        <div style="display: @(errorAlert ? "block" : "none")">
+            <Alert Color="Color.Danger" Visible="true">
+                <AlertMessage>Error!</AlertMessage>
+                <AlertDescription>@errorMessage</AlertDescription>
+                <CloseButton Clicked="() => errorAlert = false" />
+            </Alert>
+        </div>
+        <div style="display: @(deviceAccessAlert ? "block" : "none")">
+            <Alert Color="Color.Warning" Visible="true">
+                <AlertMessage>Note!</AlertMessage>
+                <AlertDescription>The browser should ask you to allow access to your camera and microphone. You need to accept that in order to use this site.</AlertDescription>
+                <CloseButton Clicked="() => deviceAccessAlert = false" />
+            </Alert>
+        </div>
+        <Row>
+            <Column ColumnSize="ColumnSize.Is2">
+                <Card>
+                    <CardBody>
+                        <CardTitle Size="5">Users Online</CardTitle>
+                        <CardText>
+                            @foreach (var user in usersList)
+                            {
+                                <div>
+                                    <Icon Name="IconName.User" Margin="Margin.Is1"></Icon> @user.Name
+                                </div>
+                            }
+                        </CardText>
+                    </CardBody>
+                </Card>
+            </Column>
+            <Column ColumnSize="ColumnSize.Is5">
+                <Card>
+                    <CardBody>
+                        <CardTitle Size="5">You</CardTitle>
+                        <CardText>
+                            <video id="my-video" autoplay="autoplay"></video>
+                        </CardText>
+                    </CardBody>
+                </Card>
+            </Column>
+            <Column ColumnSize="ColumnSize.Is5">
+                <Card>
+                    <CardBody>
+                        <CardTitle Size="5">Partner</CardTitle>
+                        <CardText>
+                            <video id="partner-video" autoplay="autoplay"></video>
+                        </CardText>
+                    </CardBody>
+                </Card>
+            </Column>
+        </Row>
+    </LayoutContent>
+</Layout>
+
+@code {
+    Modal userNameModal;
+    string userName;
+    List<User> usersList = new List<User>();
+    bool errorAlert;
+    bool deviceAccessAlert = true;
+
+    string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        HubService.OnUsersUpdated += (users) =>
+        {
+            usersList = users;
+            StateHasChanged();
+        };
+
+        BrowserService.OnLocalMediaAttached += (success) =>
+        {
+            if (success)
+            {
+                deviceAccessAlert = false;
+            }
+            else
+            {
+                ShowError("Failed to get hardware access. Please make sure that another browser or program isn't using your camera/microphone.");
+                //ShowError("Your browser does not support WebRTC. Please install a modern browser such as Chrome or Firefox to use this site.");
+            }
+
+            StateHasChanged();
+        };
+
+        userName = await BrowserService.GetUserName();
+
+        if (string.IsNullOrEmpty(userName))
+        {
+            userNameModal.Show();
+        }
+        else
+        {
+            await Join();
+        }
+    }
+
+    async Task Start()
+    {
+        userNameModal.Hide();
+        await BrowserService.SetUserName(userName);
+        await Join();
+    }
+
+    async Task Join()
+    {
+        await HubService.Join(userName);
+        await BrowserService.AttachLocalMedia();
+    }
+
+    void ShowError(string message)
+    {
+        errorMessage = message;
+        errorAlert = true;
+        deviceAccessAlert = false;
+    }
+
+    public void Dispose()
+    {
+        _ = HubService.Dispose();
+    }
+}
