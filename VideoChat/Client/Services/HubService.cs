@@ -14,6 +14,10 @@ namespace VideoChat.Client.Services
         private readonly NavigationManager _navigationManager;
 
         public event Action<List<User>> OnUsersUpdated;
+        public event Action<string> OnIncomingCall;
+        public event Action<string> OnCallAccepted;
+        public event Action<string> OnCallDeclined;
+        public event Action<string> OnCallEnded;
 
         public HubService(NavigationManager navigationManager)
         {
@@ -57,11 +61,46 @@ namespace VideoChat.Client.Services
             {
                 OnUsersUpdated?.Invoke(message.FromJson<List<User>>());
             });
+
+            _hubConnection.On<string>("IncomingCall", (connectionId) =>
+            {
+                OnIncomingCall?.Invoke(connectionId);
+            });
+
+            _hubConnection.On<string>("CallAccepted", (connectionId) =>
+            {
+                OnCallAccepted?.Invoke(connectionId);
+            });
+
+            _hubConnection.On<string, string>("CallDeclined", (connectionId, message) =>
+            {
+                OnCallDeclined?.Invoke(message);
+            });
+
+            _hubConnection.On<string, string>("CallEnded", (connectionId, message) =>
+            {
+                OnCallEnded?.Invoke(message);
+            });
         }
 
         public Task Join(string userName)
         {
             return _hubConnection.SendAsync("Join", userName);
+        }
+
+        public Task CallUser(string connectionId)
+        {
+            return _hubConnection.SendAsync("CallUser", connectionId);
+        }
+
+        public Task AnswerCall(bool accept, string connectionId)
+        {
+            return _hubConnection.SendAsync("AnswerCall", accept, connectionId);
+        }
+
+        public Task HangUp()
+        {
+            return _hubConnection.SendAsync("HangUp");
         }
 
         public Task Dispose()
@@ -70,6 +109,6 @@ namespace VideoChat.Client.Services
         }
 
         public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
-        public string State => _hubConnection?.State.ToString();
+        public string State => _hubConnection?.State.ToString() ?? HubConnectionState.Disconnected.ToString();
     }
 }

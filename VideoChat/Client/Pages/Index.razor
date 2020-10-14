@@ -22,8 +22,6 @@
         <hr />
     </LayoutHeader>
     <LayoutContent Margin="Margin.Is3">
-        <Button Clicked="@(()=>incomingCallModal.Show())">Test</Button>
-
         <Snackbar @ref="popup" Color="SnackbarColor.Danger" Location="SnackbarLocation.Right" Interval="5000">
             <SnackbarBody>
                 @popupMessage
@@ -49,7 +47,7 @@
             <ModalBackdrop />
             <ModalContent Centered="true">
                 <ModalBody>
-                    User @callingUserName is calling you. Do you want to accept the call?
+                    User @caller?.Name is calling you. Do you want to accept the call?
                 </ModalBody>
                 <ModalFooter>
                     <Button Color="Color.Secondary" Clicked="DeclineCall">Decline</Button>
@@ -73,7 +71,7 @@
             </Alert>
         </div>
         <Row>
-            <Column ColumnSize="ColumnSize.Is2">
+            <Column ColumnSize="ColumnSize.IsAuto">
                 <Card>
                     <CardBody>
                         <CardTitle Size="5">Users Online</CardTitle>
@@ -84,7 +82,14 @@
                                     <Icon Name="IconName.User" Margin="Margin.Is1"></Icon> @user.Name
                                     @if (user.Name != userName)
                                     {
-                                        <Button Clicked="() => Call(user)" Margin="Margin.Is1" Color="Color.Primary" Size="ButtonSize.Small">Call</Button>
+                                        if (state == State.Idle)
+                                        {
+                                            <Button Clicked="() => Call(user)" Margin="Margin.Is1" Color="Color.Primary" Size="ButtonSize.Small">Call</Button>
+                                        }
+                                        else
+                                        {
+                                            <Button Clicked="() => HangUp(user)" Margin="Margin.Is1" Color="Color.Danger" Size="ButtonSize.Small">Hang Up</Button>
+                                        }
                                     }
                                 </div>
                             }
@@ -92,7 +97,7 @@
                     </CardBody>
                 </Card>
             </Column>
-            <Column ColumnSize="ColumnSize.Is5">
+            <Column>
                 <Card>
                     <CardBody>
                         <CardTitle Size="5">You</CardTitle>
@@ -102,7 +107,7 @@
                     </CardBody>
                 </Card>
             </Column>
-            <Column ColumnSize="ColumnSize.Is5">
+            <Column>
                 <Card>
                     <CardBody>
                         <CardTitle Size="5">Partner</CardTitle>
@@ -117,9 +122,11 @@
 </Layout>
 
 @code {
+    State state;
     Snackbar popup;
     Modal userNameModal, incomingCallModal;
-    string userName, callingUserName;
+    string userName;
+    User caller, callee;
     List<User> usersList = new List<User>();
     bool errorAlert;
     bool deviceAccessAlert = true;
@@ -133,6 +140,43 @@
         {
             usersList = users;
             StateHasChanged();
+        };
+
+        HubService.OnCallDeclined += (message) =>
+        {
+            ShowPopup(message);
+            callee = null;
+            state = State.Idle;
+            StateHasChanged();
+        };
+
+        HubService.OnCallEnded += (message) =>
+        {
+            ShowPopup(message);
+            callee = null;
+            state = State.Idle;
+
+        // Close connection here
+
+        StateHasChanged();
+        };
+
+        HubService.OnIncomingCall += (connectionId) =>
+        {
+            var user = usersList.SingleOrDefault(x => x.ConnectionId == connectionId);
+
+            if (user != null)
+            {
+                caller = user;
+                incomingCallModal.Show();
+            }
+        };
+
+        HubService.OnCallAccepted += (connectionId) =>
+        {
+            state = State.InCall;
+
+            // Init connection here
         };
 
         BrowserService.OnLocalMediaAttached += (success) =>
@@ -175,13 +219,18 @@
         await BrowserService.AttachLocalMedia();
     }
 
-    void AcceptCall()
+    async Task AcceptCall()
     {
+        await HubService.AnswerCall(true, caller.ConnectionId);
+
+        state = State.InCall;
         incomingCallModal.Hide();
     }
 
-    void DeclineCall()
+    async Task DeclineCall()
     {
+        await HubService.AnswerCall(false, caller.ConnectionId);
+
         incomingCallModal.Hide();
         ShowPopup("Call declined");
     }
@@ -201,7 +250,16 @@
 
     void Call(User user)
     {
+        HubService.CallUser(user.ConnectionId);
+        callee = user;
+        state = State.Calling;
+    }
 
+    void HangUp(User user)
+    {
+        HubService.HangUp();
+        callee = null;
+        state = State.Idle;
     }
 
     public void Dispose()
