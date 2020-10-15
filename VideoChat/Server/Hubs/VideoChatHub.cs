@@ -139,6 +139,24 @@ namespace VideoChat.Server.Hubs
             SendUsersListUpdate();
         }
 
+        public void SendSignal(string signal, string connectionId)
+        {
+            var caller = Users.SingleOrDefault(u => u.ConnectionId == Context.ConnectionId);
+            var callee = Users.SingleOrDefault(u => u.ConnectionId == connectionId);
+
+            if (caller == null || callee == null)
+            {
+                return;
+            }
+
+            var userCall = GetUserCall(caller.ConnectionId);
+
+            if (userCall != null && userCall.Users.Exists(u => u.ConnectionId == callee.ConnectionId))
+            {
+                Clients.Client(connectionId).ReceiveSignal(caller.ConnectionId, signal);
+            }
+        }
+
 
         public override async Task OnDisconnectedAsync(Exception exception)
         {

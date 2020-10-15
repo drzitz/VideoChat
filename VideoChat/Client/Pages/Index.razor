@@ -142,23 +142,17 @@
             StateHasChanged();
         };
 
-        HubService.OnCallDeclined += (message) =>
+        HubService.OnCallDeclined += (connectionId, message) =>
         {
             ShowPopup(message);
-            callee = null;
-            state = State.Idle;
-            StateHasChanged();
+            Reset();
         };
 
-        HubService.OnCallEnded += (message) =>
+        HubService.OnCallEnded += (connectionId, message) =>
         {
             ShowPopup(message);
-            callee = null;
-            state = State.Idle;
-
-        // Close connection here
-
-        StateHasChanged();
+            BrowserService.CloseConnection(connectionId);
+            Reset();
         };
 
         HubService.OnIncomingCall += (connectionId) =>
@@ -175,8 +169,7 @@
         HubService.OnCallAccepted += (connectionId) =>
         {
             state = State.InCall;
-
-            // Init connection here
+            BrowserService.InitiateOffer(connectionId);
         };
 
         BrowserService.OnLocalMediaAttached += (success) =>
@@ -192,6 +185,16 @@
             }
 
             StateHasChanged();
+        };
+
+        BrowserService.OnSendSignal += (string data, string connectionId) =>
+        {
+            HubService.SendSignal(data, connectionId);
+        };
+
+        HubService.OnSignalReceived += (connectionId, data) =>
+        {
+            BrowserService.ProcessSignal(connectionId, data);
         };
 
         userName = await BrowserService.GetUserName();
@@ -216,7 +219,7 @@
     async Task Join()
     {
         await HubService.Join(userName);
-        await BrowserService.AttachLocalMedia();
+        await BrowserService.Init();
     }
 
     async Task AcceptCall()
@@ -258,8 +261,17 @@
     void HangUp(User user)
     {
         HubService.HangUp();
+        BrowserService.CloseConnection(user.ConnectionId);
+
+        Reset();
+    }
+
+    void Reset()
+    {
+        caller = null;
         callee = null;
         state = State.Idle;
+        StateHasChanged();
     }
 
     public void Dispose()

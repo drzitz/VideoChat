@@ -16,8 +16,9 @@ namespace VideoChat.Client.Services
         public event Action<List<User>> OnUsersUpdated;
         public event Action<string> OnIncomingCall;
         public event Action<string> OnCallAccepted;
-        public event Action<string> OnCallDeclined;
-        public event Action<string> OnCallEnded;
+        public event Action<string, string> OnCallDeclined;
+        public event Action<string, string> OnCallEnded;
+        public event Action<string, string> OnSignalReceived;
 
         public HubService(NavigationManager navigationManager)
         {
@@ -74,12 +75,17 @@ namespace VideoChat.Client.Services
 
             _hubConnection.On<string, string>("CallDeclined", (connectionId, message) =>
             {
-                OnCallDeclined?.Invoke(message);
+                OnCallDeclined?.Invoke(connectionId, message);
             });
 
             _hubConnection.On<string, string>("CallEnded", (connectionId, message) =>
             {
-                OnCallEnded?.Invoke(message);
+                OnCallEnded?.Invoke(connectionId, message);
+            });
+
+            _hubConnection.On<string, string>("ReceiveSignal", (connectionId, data) =>
+            {
+                OnSignalReceived?.Invoke(connectionId, data);
             });
         }
 
@@ -101,6 +107,11 @@ namespace VideoChat.Client.Services
         public Task HangUp()
         {
             return _hubConnection.SendAsync("HangUp");
+        }
+
+        public Task SendSignal(string signal, string connectionId)
+        {
+            return _hubConnection.SendAsync("SendSignal", signal, connectionId);
         }
 
         public Task Dispose()

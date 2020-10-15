@@ -9,5 +9,6 @@ namespace VideoChat.Server.Hubs
         Task CallDeclined(string connectionId, string message);
         Task CallEnded(string connectionId, string message);
         Task IncomingCall(string connectionId);
+        Task ReceiveSignal(string connectionId, string data);
     }
 }
