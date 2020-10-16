@@ -134,7 +134,11 @@ namespace VideoChat.Server.Hubs
                 }
             }
 
-            CallOffers.RemoveAll(x => x.Caller.ConnectionId == caller.ConnectionId);
+            foreach (var offer in CallOffers.Where(x => x.Caller.ConnectionId == caller.ConnectionId).ToArray())
+            {
+                CallOffers.Remove(offer);
+                Clients.Client(offer.Callee.ConnectionId).CallEnded(caller.ConnectionId, string.Format("{0} canceled the call", caller.Name));
+            }
 
             SendUsersListUpdate();
         }

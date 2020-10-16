@@ -150,6 +150,7 @@
 
         HubService.OnCallEnded += (connectionId, message) =>
         {
+            incomingCallModal.Hide();
             ShowPopup(message);
             BrowserService.CloseConnection(connectionId);
             Reset();
