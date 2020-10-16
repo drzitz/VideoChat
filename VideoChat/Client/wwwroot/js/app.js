@@ -20,7 +20,7 @@ VideoChat.App = (function () {
                 _mediaStream = stream;
                 console.log('App: playing my local video feed');
 
-                _attachMedia('my-video', _mediaStream);
+                _attachMedia('my-video', _mediaStream, true);
 
                 ref.invokeMethodAsync('AttachLocalMediaCallback', true);
             },
@@ -30,9 +30,13 @@ VideoChat.App = (function () {
         );
     };
 
-    var _attachMedia = function (id, stream) {
+    var _attachMedia = function (id, stream, muted) {
         var videoElement = document.getElementById(id);
         videoElement.srcObject = stream;
+
+        if (muted) {
+            videoElement.muted = true;
+        }
     };
 
     var _detachMedia = function (id) {
