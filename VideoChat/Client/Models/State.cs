@@ -3,7 +3,9 @@
     public enum State
     {
         Idle,
+        Loading,
         Calling,
-        InCall
+        InCall,
+        Error
     }
 }

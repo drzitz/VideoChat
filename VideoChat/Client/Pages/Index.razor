@@ -78,20 +78,20 @@
                         <CardText>
                             @foreach (var user in usersList)
                             {
-                                <div>
-                                    <Icon Name="IconName.User" Margin="Margin.Is1"></Icon> @user.Name
-                                    @if (user.Name != userName)
+                            <div>
+                                <Icon Name="IconName.User" Margin="Margin.Is1"></Icon> @user.Name
+                                @if (user.Name != userName)
+                                {
+                                    if (state == State.Calling || state == State.InCall)
                                     {
-                                        if (state == State.Idle)
-                                        {
-                                            <Button Clicked="() => Call(user)" Margin="Margin.Is1" Color="Color.Primary" Size="ButtonSize.Small">Call</Button>
-                                        }
-                                        else
-                                        {
-                                            <Button Clicked="() => HangUp(user)" Margin="Margin.Is1" Color="Color.Danger" Size="ButtonSize.Small">Hang Up</Button>
-                                        }
+                                        <Button Clicked="() => HangUp(user)" Margin="Margin.Is1" Color="Color.Danger" Size="ButtonSize.Small">Hang Up</Button>
                                     }
-                                </div>
+                                    else
+                                    {
+                                        <Button Clicked="() => Call(user)" Margin="Margin.Is1" Color="Color.Primary" Size="ButtonSize.Small">Call</Button>
+                                    }
+                                }
+                            </div>
                             }
                         </CardText>
                     </CardBody>
@@ -102,7 +102,7 @@
                     <CardBody>
                         <CardTitle Size="5">You</CardTitle>
                         <CardText>
-                            <video id="my-video" autoplay="autoplay" muted="muted"></video>
+                            <video style="background-image: url('svg/@(state == State.Loading ? "puff" : (state == State.Error ? "times" : "user")).svg')" id="my-video" autoplay="autoplay" muted="muted"></video>
                         </CardText>
                     </CardBody>
                 </Card>
@@ -112,7 +112,7 @@
                     <CardBody>
                         <CardTitle Size="5">Partner</CardTitle>
                         <CardText>
-                            <video id="partner-video" autoplay="autoplay"></video>
+                            <video style="background-image: url('svg/@(state == State.Calling ? "puff" : "user").svg')" id="partner-video" autoplay="autoplay"></video>
                         </CardText>
                     </CardBody>
                 </Card>
@@ -178,9 +178,11 @@
             if (success)
             {
                 deviceAccessAlert = false;
+                state = State.Idle;
             }
             else
             {
+                state = State.Error;
                 ShowError("Failed to get hardware access. Please make sure that another browser or program isn't using your camera/microphone.");
                 //ShowError("Your browser does not support WebRTC. Please install a modern browser such as Chrome or Firefox to use this site.");
             }
@@ -220,6 +222,7 @@
     async Task Join()
     {
         await HubService.Join(userName);
+        state = State.Loading;
         await BrowserService.Init();
     }
 
