@@ -164,7 +164,29 @@ namespace VideoChat.Server.Hubs
 
         public override async Task OnDisconnectedAsync(Exception exception)
         {
-            Users.RemoveAll(x => x.ConnectionId == Context.ConnectionId);
+            var caller = Users.SingleOrDefault(x => x.ConnectionId == Context.ConnectionId);
+
+            if (caller == null)
+            {
+                return;
+            }
+
+            foreach (var call in UserCalls.Where(x => x.Users.Any(u => u.ConnectionId == caller.ConnectionId)).ToArray())
+            {
+                var otherUser = call.Users.SingleOrDefault(u => u.ConnectionId != caller.ConnectionId);
+                _ = Clients.Client(otherUser.ConnectionId).CallEnded(caller.ConnectionId, string.Format("{0} has disconnected", caller.Name));
+
+                UserCalls.Remove(call);
+            }
+
+            foreach (var offer in CallOffers.Where(x => x.Caller.ConnectionId == caller.ConnectionId).ToArray())
+            {
+                _ = Clients.Client(offer.Callee.ConnectionId).CallEnded(caller.ConnectionId, string.Format("{0} has disconnected", caller.Name));
+
+                CallOffers.Remove(offer);
+            }
+
+            Users.Remove(caller);
             await SendUsersListUpdate();
 
             await base.OnDisconnectedAsync(exception);
