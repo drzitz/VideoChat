@@ -10,7 +10,10 @@ VideoChat.App = (function () {
         _ref = ref;
         navigator.getUserMedia(
             {
-                video: true,
+                video: {
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                },
                 audio: true
             },
             function (stream) {
