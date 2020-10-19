@@ -1,5 +1,4 @@
 ﻿using System.Threading.Tasks;
-using VideoChat.Shared.Models;
 
 namespace VideoChat.Server.Hubs
 {

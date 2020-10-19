@@ -62,15 +62,12 @@ VideoChat.App = (function () {
             }
         };
 
-        connection.onstatechange = function () {
-            var states = {
-                'iceConnectionState': connection.iceConnectionState,
-                'iceGatheringState': connection.iceGatheringState,
-                'readyState': connection.readyState,
-                'signalingState': connection.signalingState
-            };
+        connection.onconnectionstatechange = function () {
+            console.log('WebRTC: connection state changed to "' + connection.connectionState + '"');
+        };
 
-            console.log('WebRTC: state changed. ' + JSON.stringify(states));
+        connection.oniceconnectionstatechange = function () {
+            console.log('WebRTC: ice connection state changed to "' + connection.iceConnectionState + '"');
         };
 
         connection.onaddstream = function (event) {
@@ -169,7 +166,8 @@ VideoChat.App = (function () {
         init: _init,
         initiateOffer: _initiateOffer,
         processSignal: _processSignal,
-        closeConnection: _closeConnection
+        closeConnection: _closeConnection,
+        connections: _connections
     };
 })();
 
