@@ -179,9 +179,10 @@ namespace VideoChat.Server.Hubs
                 UserCalls.Remove(call);
             }
 
-            foreach (var offer in CallOffers.Where(x => x.Caller.ConnectionId == caller.ConnectionId).ToArray())
+            foreach (var offer in CallOffers.Where(x => x.Caller.ConnectionId == caller.ConnectionId || x.Callee.ConnectionId == caller.ConnectionId).ToArray())
             {
-                _ = Clients.Client(offer.Callee.ConnectionId).CallEnded(caller.ConnectionId, string.Format("{0} has disconnected", caller.Name));
+                var otherUser = offer.Caller.ConnectionId == caller.ConnectionId ? offer.Callee : offer.Caller;
+                _ = Clients.Client(otherUser.ConnectionId).CallEnded(caller.ConnectionId, string.Format("{0} has disconnected", caller.Name));
 
                 CallOffers.Remove(offer);
             }
