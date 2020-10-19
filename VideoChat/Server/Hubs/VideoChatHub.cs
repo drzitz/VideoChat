@@ -37,18 +37,18 @@ namespace VideoChat.Server.Hubs
 
         public void CallUser(string connectionId)
         {
-            var caller = Users.SingleOrDefault(u => u.ConnectionId == Context.ConnectionId);
-            var callee = Users.SingleOrDefault(u => u.ConnectionId == connectionId);
+            var caller = GetCaller();
+            var callee = GetCallee(connectionId);
 
             if (callee == null)
             {
-                Clients.Caller.CallDeclined(connectionId, "The user you called has left");
+                SendCallDeclined(caller, callee, UserAction.Leave);
                 return;
             }
 
             if (GetUserCall(callee.ConnectionId) != null)
             {
-                Clients.Caller.CallDeclined(connectionId, string.Format("{0} is already in a call", callee.Name));
+                SendCallDeclined(caller, callee, UserAction.Busy);
                 return;
             }
 
@@ -63,8 +63,8 @@ namespace VideoChat.Server.Hubs
         
         public void AnswerCall(bool accept, string connectionId)
         {
-            var caller = Users.SingleOrDefault(x => x.ConnectionId == Context.ConnectionId);
-            var callee = Users.SingleOrDefault(x => x.ConnectionId == connectionId);
+            var caller = GetCaller();
+            var callee = GetCallee(connectionId);
 
             if (caller == null)
             {
@@ -73,30 +73,30 @@ namespace VideoChat.Server.Hubs
 
             if (callee == null)
             {
-                Clients.Caller.CallEnded(connectionId, "The other user in your call has left");
+                SendCallEnded(caller, callee, UserAction.Leave);
                 return;
             }
 
             if (accept == false)
             {
-                Clients.Client(connectionId).CallDeclined(caller.ConnectionId, string.Format("{0} did not accept your call", caller.Name));
+                SendCallDeclined(callee, caller, UserAction.Decline);
                 return;
             }
 
-            var offerCount = CallOffers.RemoveAll(x => x.Callee.ConnectionId == caller.ConnectionId && x.Caller.ConnectionId == callee.ConnectionId);
+            var offerCount = CallOffers.RemoveAll(x => x.Callee == caller && x.Caller == callee);
             if (offerCount < 1)
             {
-                Clients.Caller.CallEnded(connectionId, string.Format("{0} has already hung up.", callee.Name));
+                SendCallEnded(caller, callee, UserAction.HangUp);
                 return;
             }
 
             if (GetUserCall(callee.ConnectionId) != null)
             {
-                Clients.Caller.CallDeclined(connectionId, string.Format("{0} currently in another call", callee.Name));
+                SendCallDeclined(caller, callee, UserAction.Busy);
                 return;
             }
 
-            CallOffers.RemoveAll(c => c.Caller.ConnectionId == callee.ConnectionId);
+            CallOffers.RemoveAll(c => c.Caller == callee);
 
             UserCalls.Add(new UserCall
             {
@@ -110,7 +110,7 @@ namespace VideoChat.Server.Hubs
 
         public void HangUp()
         {
-            var caller = Users.SingleOrDefault(u => u.ConnectionId == Context.ConnectionId);
+            var caller = GetCaller();
 
             if (caller == null)
             {
@@ -121,12 +121,12 @@ namespace VideoChat.Server.Hubs
 
             if (currentCall != null)
             {
-                foreach (var user in currentCall.Users.Where(x => x.ConnectionId != caller.ConnectionId))
+                foreach (var user in currentCall.Users.Where(x => x != caller))
                 {
-                    Clients.Client(user.ConnectionId).CallEnded(caller.ConnectionId, string.Format("{0} has hung up", caller.Name));
+                    SendCallEnded(user, caller, UserAction.HangUp);
                 }
 
-                currentCall.Users.RemoveAll(u => u.ConnectionId == caller.ConnectionId);
+                currentCall.Users.RemoveAll(x => x == caller);
 
                 if (currentCall.Users.Count < 2)
                 {
@@ -134,10 +134,10 @@ namespace VideoChat.Server.Hubs
                 }
             }
 
-            foreach (var offer in CallOffers.Where(x => x.Caller.ConnectionId == caller.ConnectionId).ToArray())
+            foreach (var offer in CallOffers.Where(x => x.Caller == caller).ToArray())
             {
-                CallOffers.Remove(offer);
-                Clients.Client(offer.Callee.ConnectionId).CallEnded(caller.ConnectionId, string.Format("{0} canceled the call", caller.Name));
+                SendCallEnded(offer.Callee, caller, UserAction.Cancel);
+                CallOffers.Remove(offer); 
             }
 
             SendUsersListUpdate();
@@ -145,8 +145,8 @@ namespace VideoChat.Server.Hubs
 
         public void SendSignal(string signal, string connectionId)
         {
-            var caller = Users.SingleOrDefault(u => u.ConnectionId == Context.ConnectionId);
-            var callee = Users.SingleOrDefault(u => u.ConnectionId == connectionId);
+            var caller = GetCaller();
+            var callee = GetCallee(connectionId);
 
             if (caller == null || callee == null)
             {
@@ -155,34 +155,33 @@ namespace VideoChat.Server.Hubs
 
             var userCall = GetUserCall(caller.ConnectionId);
 
-            if (userCall != null && userCall.Users.Exists(u => u.ConnectionId == callee.ConnectionId))
+            if (userCall != null && userCall.Users.Exists(x => x == callee))
             {
                 Clients.Client(connectionId).ReceiveSignal(caller.ConnectionId, signal);
             }
         }
 
-
         public override async Task OnDisconnectedAsync(Exception exception)
         {
-            var caller = Users.SingleOrDefault(x => x.ConnectionId == Context.ConnectionId);
+            var caller = GetCaller();
 
             if (caller == null)
             {
                 return;
             }
 
-            foreach (var call in UserCalls.Where(x => x.Users.Any(u => u.ConnectionId == caller.ConnectionId)).ToArray())
+            foreach (var call in UserCalls.Where(x => x.Users.Any(x => x == caller)).ToArray())
             {
-                var otherUser = call.Users.SingleOrDefault(u => u.ConnectionId != caller.ConnectionId);
-                _ = Clients.Client(otherUser.ConnectionId).CallEnded(caller.ConnectionId, string.Format("{0} has disconnected", caller.Name));
+                var otherUser = call.Users.SingleOrDefault(x => x != caller);
+                _ = SendCallEnded(otherUser, caller, UserAction.Leave);
 
                 UserCalls.Remove(call);
             }
 
-            foreach (var offer in CallOffers.Where(x => x.Caller.ConnectionId == caller.ConnectionId || x.Callee.ConnectionId == caller.ConnectionId).ToArray())
+            foreach (var offer in CallOffers.Where(x => x.Caller == caller || x.Callee == caller).ToArray())
             {
-                var otherUser = offer.Caller.ConnectionId == caller.ConnectionId ? offer.Callee : offer.Caller;
-                _ = Clients.Client(otherUser.ConnectionId).CallEnded(caller.ConnectionId, string.Format("{0} has disconnected", caller.Name));
+                var otherUser = offer.Caller == caller ? offer.Callee : offer.Caller;
+                _ = SendCallEnded(otherUser, caller, UserAction.Leave);
 
                 CallOffers.Remove(offer);
             }
@@ -193,9 +192,30 @@ namespace VideoChat.Server.Hubs
             await base.OnDisconnectedAsync(exception);
         }
 
+
         private Task SendUsersListUpdate()
         {
             return Clients.All.UpdateUsersList(Users.ToJson());
+        }
+
+        private Task SendCallEnded(User to, User from, UserAction action)
+        {
+            return Clients.Client(to.ConnectionId).CallEnded(new ActionMessage { User = from, Action = action }.ToJson());
+        }
+
+        private Task SendCallDeclined(User to, User from, UserAction action)
+        {
+            return Clients.Client(to.ConnectionId).CallDeclined(new ActionMessage { User = from, Action = action }.ToJson());
+        }
+
+        private User GetCaller()
+        {
+            return Users.SingleOrDefault(x => x.ConnectionId == Context.ConnectionId);
+        }
+
+        private User GetCallee(string connectionId)
+        {
+            return Users.SingleOrDefault(x => x.ConnectionId == connectionId);
         }
 
         private UserCall GetUserCall(string connectionId)

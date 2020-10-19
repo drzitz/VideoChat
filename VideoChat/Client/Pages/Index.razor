@@ -142,17 +142,17 @@
             StateHasChanged();
         };
 
-        HubService.OnCallDeclined += (connectionId, message) =>
+        HubService.OnCallDeclined += (message) =>
         {
-            ShowPopup(message);
+            ShowPopup(FormatMessage(message));
             Reset();
         };
 
-        HubService.OnCallEnded += (connectionId, message) =>
+        HubService.OnCallEnded += (message) =>
         {
             incomingCallModal.Hide();
-            ShowPopup(message);
-            BrowserService.CloseConnection(connectionId);
+            ShowPopup(FormatMessage(message));
+            BrowserService.CloseConnection(message.User.ConnectionId);
             Reset();
         };
 
@@ -253,6 +253,21 @@
     {
         popupMessage = message;
         popup.Show();
+    }
+
+    string FormatMessage(ActionMessage message)
+    {
+        var token = message.Action switch
+        {
+            UserAction.Decline => "declined your call",
+            UserAction.Leave => "has left",
+            UserAction.Busy => "is busy",
+            UserAction.HangUp => "hung up",
+            UserAction.Cancel => "cancelled the call",
+            _ => message.Action.ToString().ToLowerInvariant()
+        };
+
+        return $"{message.User.Name} {token}";
     }
 
     void Call(User user)

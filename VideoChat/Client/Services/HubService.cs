@@ -16,8 +16,8 @@ namespace VideoChat.Client.Services
         public event Action<List<User>> OnUsersUpdated;
         public event Action<string> OnIncomingCall;
         public event Action<string> OnCallAccepted;
-        public event Action<string, string> OnCallDeclined;
-        public event Action<string, string> OnCallEnded;
+        public event Action<ActionMessage> OnCallDeclined;
+        public event Action<ActionMessage> OnCallEnded;
         public event Action<string, string> OnSignalReceived;
 
         public HubService(NavigationManager navigationManager)
@@ -73,14 +73,14 @@ namespace VideoChat.Client.Services
                 OnCallAccepted?.Invoke(connectionId);
             });
 
-            _hubConnection.On<string, string>("CallDeclined", (connectionId, message) =>
+            _hubConnection.On<string>("CallDeclined", (message) =>
             {
-                OnCallDeclined?.Invoke(connectionId, message);
+                OnCallDeclined?.Invoke(message.FromJson<ActionMessage>());
             });
 
-            _hubConnection.On<string, string>("CallEnded", (connectionId, message) =>
+            _hubConnection.On<string>("CallEnded", (message) =>
             {
-                OnCallEnded?.Invoke(connectionId, message);
+                OnCallEnded?.Invoke(message.FromJson<ActionMessage>());
             });
 
             _hubConnection.On<string, string>("ReceiveSignal", (connectionId, data) =>

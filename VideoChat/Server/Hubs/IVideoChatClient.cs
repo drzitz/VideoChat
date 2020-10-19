@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using VideoChat.Shared.Models;
 
 namespace VideoChat.Server.Hubs
 {
@@ -6,8 +7,8 @@ namespace VideoChat.Server.Hubs
     {
         Task UpdateUsersList(string users);
         Task CallAccepted(string connectionId);
-        Task CallDeclined(string connectionId, string message);
-        Task CallEnded(string connectionId, string message);
+        Task CallDeclined(string message);
+        Task CallEnded(string message);
         Task IncomingCall(string connectionId);
         Task ReceiveSignal(string connectionId, string data);
     }
