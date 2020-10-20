@@ -34,6 +34,11 @@ namespace VideoChat.Client.Services
             return _localStorage.SetItemAsync("User", new UserInfo { Name = userName, Password = password });
         }
 
+        public ValueTask RemoveUser()
+        {
+            return _localStorage.RemoveItemAsync("User");
+        }
+
         public ValueTask Init()
         {
             return _jsRuntime.InvokeVoidAsync("VideoChat.App.init", objRef);
@@ -52,6 +57,11 @@ namespace VideoChat.Client.Services
         public ValueTask CloseConnection(string connectionId)
         {
             return _jsRuntime.InvokeVoidAsync("VideoChat.App.closeConnection", connectionId);
+        }
+
+        public ValueTask Reset()
+        {
+            return _jsRuntime.InvokeVoidAsync("VideoChat.App.reset");
         }
 
         [JSInvokable]

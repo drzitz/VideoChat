@@ -42,11 +42,13 @@ VideoChat.App = (function () {
     var _detachMedia = function (id) {
         var videoElement = document.getElementById(id);
 
-        videoElement.srcObject.getTracks().forEach(function (track) {
-            track.stop();
-        });
+        if (videoElement.srcObject) {
+            videoElement.srcObject.getTracks().forEach(function (track) {
+                track.stop();
+            });
 
-        videoElement.srcObject = null;
+            videoElement.srcObject = null;
+        }
     };
 
     var _createConnection = function (connectionId) {
@@ -162,11 +164,20 @@ VideoChat.App = (function () {
         }
     };
 
+    var _reset = function () {
+        for (var connectionId in _connections) {
+            _closeConnection(connectionId);
+        }
+
+        _detachMedia('my-video');
+    };
+
     return {
         init: _init,
         initiateOffer: _initiateOffer,
         processSignal: _processSignal,
         closeConnection: _closeConnection,
+        reset: _reset,
         connections: _connections
     };
 })();

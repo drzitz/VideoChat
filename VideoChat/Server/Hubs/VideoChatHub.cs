@@ -140,25 +140,7 @@ namespace VideoChat.Server.Hubs
             SendUsersListUpdate();
         }
 
-        public void SendSignal(string signal, string connectionId)
-        {
-            var caller = GetCaller();
-            var callee = GetCallee(connectionId);
-
-            if (caller == null || callee == null)
-            {
-                return;
-            }
-
-            var userCall = GetUserCall(caller.ConnectionId);
-
-            if (userCall != null && userCall.Users.Exists(x => x == callee))
-            {
-                Clients.Client(connectionId).ReceiveSignal(caller.ConnectionId, signal);
-            }
-        }
-
-        public override async Task OnDisconnectedAsync(Exception exception)
+        public async Task Leave()
         {
             var caller = GetCaller();
 
@@ -186,7 +168,29 @@ namespace VideoChat.Server.Hubs
             caller.ConnectionId = null;
             await Users.UpdateOneAsync(caller.Id, caller);
             await SendUsersListUpdate();
+        }
 
+        public void SendSignal(string signal, string connectionId)
+        {
+            var caller = GetCaller();
+            var callee = GetCallee(connectionId);
+
+            if (caller == null || callee == null)
+            {
+                return;
+            }
+
+            var userCall = GetUserCall(caller.ConnectionId);
+
+            if (userCall != null && userCall.Users.Exists(x => x == callee))
+            {
+                Clients.Client(connectionId).ReceiveSignal(caller.ConnectionId, signal);
+            }
+        }
+
+        public override async Task OnDisconnectedAsync(Exception exception)
+        {
+            await Leave();
             await base.OnDisconnectedAsync(exception);
         }
 

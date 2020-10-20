@@ -109,6 +109,11 @@ namespace VideoChat.Client.Services
             return _hubConnection.SendAsync("HangUp");
         }
 
+        public Task Leave()
+        {
+            return _hubConnection.SendAsync("Leave");
+        }
+
         public Task SendSignal(string signal, string connectionId)
         {
             return _hubConnection.SendAsync("SendSignal", signal, connectionId);
@@ -119,6 +124,7 @@ namespace VideoChat.Client.Services
             return _hubConnection.DisposeAsync();
         }
 
+        public string ConnectionId => _hubConnection?.ConnectionId;
         public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
         public string State => _hubConnection?.State.ToString() ?? HubConnectionState.Disconnected.ToString();
     }

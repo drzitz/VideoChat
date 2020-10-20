@@ -10,10 +10,11 @@
             <BarMenu>
                 <BarStart>Hub: @HubService.State</BarStart>
                 <BarEnd>
-                    @if (!string.IsNullOrEmpty(userName))
+                    @if (Me != null)
                     {
                         <BarItem>
-                            <Icon Name="IconName.User" Margin="Margin.Is1"></Icon>@userName
+                            <Icon Name="IconName.User" Margin="Margin.Is1"></Icon>@Me.Name
+                            <Button Margin="Margin.Is1" Size="ButtonSize.Small" Color="Color.Warning" Clicked="Logout">Logout</Button>
                         </BarItem>
                     }
                 </BarEnd>
@@ -142,6 +143,7 @@
     List<User> usersList = new List<User>();
     bool errorAlert;
     bool deviceAccessAlert = true;
+    User Me => usersList.FirstOrDefault(x => x.ConnectionId == HubService.ConnectionId);
 
     string errorMessage, popupMessage, loginMessage;
 
@@ -247,6 +249,22 @@
         {
             loginMessage = "Login failed: invalid user name or password";
         }
+    }
+
+    async Task Logout()
+    {
+        if (state == State.Calling || state == State.InCall)
+        {
+            await HubService.HangUp();
+        }
+
+        await HubService.Leave();
+        await BrowserService.Reset();
+        await BrowserService.RemoveUser();
+
+        Reset();
+
+        loginModal.Show();
     }
 
     async Task AcceptCall()
