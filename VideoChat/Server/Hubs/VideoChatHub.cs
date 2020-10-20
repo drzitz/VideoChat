@@ -16,20 +16,23 @@ namespace VideoChat.Server.Hubs
         private static readonly List<UserCall> UserCalls = new List<UserCall>();
         private static readonly List<CallOffer> CallOffers = new List<CallOffer>();
         
-        public async Task<bool> Login(string userName, string password)
+        public async Task<User> Login(string userName, string password)
         {
-            var user = Users.AsQueryable().FirstOrDefault(x => x.Name == userName && x.Password == password);
+            var user = Users.AsQueryable().FirstOrDefault(x => string.Equals(x.Name, userName, StringComparison.InvariantCultureIgnoreCase) && x.Password == password);
 
-            if (user != null)
+            if (user != null && !user.IsAdmin)
             {
                 user.ConnectionId = Context.ConnectionId;
                 await Users.UpdateOneAsync(user.Id, user);
-                await SendUsersListUpdate();
-
-                return true;
+                await SendOnlineUsers();
             }
 
-            return false;
+            return user;
+        }
+
+        public List<User> GetOnlineUsers()
+        {
+            return Users.AsQueryable().Where(x => !x.IsAdmin && x.IsOnline).ToList();
         }
 
         public void CallUser(string connectionId)
@@ -102,7 +105,7 @@ namespace VideoChat.Server.Hubs
 
             Clients.Client(connectionId).CallAccepted(caller.ConnectionId);
 
-            SendUsersListUpdate();
+            SendOnlineUsers();
         }
 
         public void HangUp()
@@ -137,14 +140,14 @@ namespace VideoChat.Server.Hubs
                 CallOffers.Remove(offer); 
             }
 
-            SendUsersListUpdate();
+            SendOnlineUsers();
         }
 
         public async Task Leave()
         {
             var caller = GetCaller();
 
-            if (caller == null)
+            if (caller == null || caller.IsAdmin)
             {
                 return;
             }
@@ -167,7 +170,7 @@ namespace VideoChat.Server.Hubs
 
             caller.ConnectionId = null;
             await Users.UpdateOneAsync(caller.Id, caller);
-            await SendUsersListUpdate();
+            await SendOnlineUsers();
         }
 
         public void SendSignal(string signal, string connectionId)
@@ -195,9 +198,9 @@ namespace VideoChat.Server.Hubs
         }
 
 
-        private Task SendUsersListUpdate()
+        private Task SendOnlineUsers()
         {
-            return Clients.All.UpdateUsersList(Users.AsQueryable().Where(x => !x.IsAdmin && x.IsOnline).ToJson());
+            return Clients.All.UpdateOnlineUsers(Users.AsQueryable().Where(x => !x.IsAdmin && x.IsOnline).ToJson());
         }
 
         private Task SendCallEnded(User to, User from, UserAction action)

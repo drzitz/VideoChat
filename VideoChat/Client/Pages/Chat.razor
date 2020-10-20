@@ -1,0 +1,250 @@
+﻿@inject HubService HubService
+@inject BrowserService BrowserService
+
+<Snackbar @ref="popup" Color="SnackbarColor.Danger" Location="SnackbarLocation.Right" Interval="5000">
+    <SnackbarBody>
+        @popupMessage
+    </SnackbarBody>
+</Snackbar>
+
+<Modal @ref="incomingCallModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
+    <ModalBackdrop />
+    <ModalContent Centered="true">
+        <ModalBody>
+            User @caller?.Name is calling you. Do you want to accept the call?
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="DeclineCall">Decline</Button>
+            <Button Color="Color.Success" Clicked="AcceptCall">Accept</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+<div style="display: @(errorAlert ? "block" : "none")">
+    <Alert Color="Color.Danger" Visible="true">
+        <AlertMessage>Error!</AlertMessage>
+        <AlertDescription>@errorMessage</AlertDescription>
+        <CloseButton Clicked="() => errorAlert = false" />
+    </Alert>
+</div>
+<div style="display: @(deviceAccessAlert ? "block" : "none")">
+    <Alert Color="Color.Warning" Visible="true">
+        <AlertMessage>Note!</AlertMessage>
+        <AlertDescription>The browser should ask you to allow access to your camera and microphone. You need to accept that in order to use this site.</AlertDescription>
+        <CloseButton Clicked="() => deviceAccessAlert = false" />
+    </Alert>
+</div>
+<Row>
+    <Column ColumnSize="ColumnSize.IsAuto">
+        <Card>
+            <CardBody>
+                <CardTitle Size="5">Users Online</CardTitle>
+                <CardText>
+                    @foreach (var user in usersList)
+                    {
+                        <div>
+                            <Icon Name="IconName.User" Margin="Margin.Is1"></Icon> @user.Name
+                            @if (user != Me)
+                            {
+                                if (state == State.Calling || state == State.InCall)
+                                {
+                                    <Button Clicked="() => HangUp(user)" Margin="Margin.Is1" Color="Color.Danger" Size="ButtonSize.Small">Hang Up</Button>
+                                }
+                                else
+                                {
+                                    <Button Clicked="() => Call(user)" Margin="Margin.Is1" Color="Color.Primary" Size="ButtonSize.Small">Call</Button>
+                                }
+                            }
+                        </div>
+                    }
+                </CardText>
+            </CardBody>
+        </Card>
+    </Column>
+    <Column>
+        <Card>
+            <CardBody>
+                <CardTitle Size="5">You</CardTitle>
+                <CardText>
+                    <video style="background-image: url('svg/@(state == State.Loading ? "puff" : (state == State.Error ? "times" : "user")).svg')" id="my-video" autoplay="autoplay"></video>
+                </CardText>
+            </CardBody>
+        </Card>
+    </Column>
+    <Column>
+        <Card>
+            <CardBody>
+                <CardTitle Size="5">Partner</CardTitle>
+                <CardText>
+                    <video style="background-image: url('svg/@(state == State.Calling ? "puff" : "user").svg')" id="partner-video" autoplay="autoplay"></video>
+                </CardText>
+            </CardBody>
+        </Card>
+    </Column>
+</Row>
+
+@code {
+    [Parameter]
+    public User Me { get; set; }
+
+    Modal incomingCallModal;
+    User caller, callee;
+    State state;
+    Snackbar popup;
+    bool errorAlert;
+    bool deviceAccessAlert = true;
+    List<User> usersList = new List<User>();
+    string errorMessage, popupMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        HubService.OnUsersUpdated += (users) =>
+        {
+            usersList = users;
+            StateHasChanged();
+        };
+
+        HubService.OnCallDeclined += (message) =>
+        {
+            ShowPopup(FormatMessage(message));
+            Reset();
+        };
+
+        HubService.OnCallEnded += (message) =>
+        {
+            incomingCallModal.Hide();
+            ShowPopup(FormatMessage(message));
+            BrowserService.CloseConnection(message.User.ConnectionId);
+            Reset();
+        };
+
+        HubService.OnIncomingCall += (connectionId) =>
+        {
+            var user = usersList.SingleOrDefault(x => x.ConnectionId == connectionId);
+
+            if (user != null)
+            {
+                caller = user;
+                incomingCallModal.Show();
+            }
+        };
+
+        HubService.OnCallAccepted += (connectionId) =>
+        {
+            state = State.InCall;
+            BrowserService.InitiateOffer(connectionId);
+        };
+
+        BrowserService.OnLocalMediaAttached += (success) =>
+        {
+            if (success)
+            {
+                deviceAccessAlert = false;
+                state = State.Idle;
+            }
+            else
+            {
+                state = State.Error;
+                ShowError("Failed to get hardware access. Please make sure that another browser or program isn't using your camera/microphone.");
+                //ShowError("Your browser does not support WebRTC. Please install a modern browser such as Chrome or Firefox to use this site.");
+            }
+
+            StateHasChanged();
+        };
+
+        BrowserService.OnSendSignal += (string data, string connectionId) =>
+        {
+            HubService.SendSignal(data, connectionId);
+        };
+
+        HubService.OnSignalReceived += (connectionId, data) =>
+        {
+            BrowserService.ProcessSignal(connectionId, data);
+        };
+
+        usersList = await HubService.GetOnlineUsers();
+
+        state = State.Loading;
+        await BrowserService.Init();
+    }
+
+    void Call(User user)
+    {
+        HubService.CallUser(user.ConnectionId);
+        callee = user;
+        state = State.Calling;
+    }
+
+    void HangUp(User user)
+    {
+        HubService.HangUp();
+        BrowserService.CloseConnection(user.ConnectionId);
+
+        Reset();
+    }
+
+    async Task AcceptCall()
+    {
+        await HubService.AnswerCall(true, caller.ConnectionId);
+
+        state = State.InCall;
+        incomingCallModal.Hide();
+    }
+
+    async Task DeclineCall()
+    {
+        await HubService.AnswerCall(false, caller.ConnectionId);
+
+        incomingCallModal.Hide();
+        ShowPopup("Call declined");
+    }
+
+    void ShowError(string message)
+    {
+        errorMessage = message;
+        errorAlert = true;
+        deviceAccessAlert = false;
+    }
+
+    void ShowPopup(string message)
+    {
+        popupMessage = message;
+        popup.Show();
+    }
+
+    string FormatMessage(ActionMessage message)
+    {
+        var token = message.Action switch
+        {
+            UserAction.Decline => "declined your call",
+            UserAction.Leave => "has left",
+            UserAction.Busy => "is busy",
+            UserAction.HangUp => "hung up",
+            UserAction.Cancel => "cancelled the call",
+            _ => message.Action.ToString().ToLowerInvariant()
+        };
+
+        return $"{message.User.Name} {token}";
+    }
+
+    void Reset()
+    {
+        caller = null;
+        callee = null;
+        state = State.Idle;
+        StateHasChanged();
+    }
+
+    public async Task Leave()
+    {
+        if (state == State.Calling || state == State.InCall)
+        {
+            await HubService.HangUp();
+        }
+
+        await BrowserService.Reset();
+        await HubService.Leave();
+
+        Reset();
+    }
+}

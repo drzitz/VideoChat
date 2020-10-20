@@ -23,204 +23,55 @@
         <hr />
     </LayoutHeader>
     <LayoutContent Margin="Margin.Is3">
-        <Snackbar @ref="popup" Color="SnackbarColor.Danger" Location="SnackbarLocation.Right" Interval="5000">
-            <SnackbarBody>
-                @popupMessage
-            </SnackbarBody>
-        </Snackbar>
-
-        <Modal @ref="loginModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
-            <ModalBackdrop />
-            <ModalContent Centered="true">
-                <ModalHeader>
-                    <ModalTitle>Login</ModalTitle>
-                </ModalHeader>
-                <ModalBody>
-                    <Field>
-                        <FieldLabel>Name</FieldLabel>
-                        <TextEdit @bind-Text="@userName" Placeholder="Name" />
-                    </Field>
-                    <Field>
-                        <FieldLabel>Password</FieldLabel>
-                        <TextEdit Attributes="@(new Dictionary<string, object>() {{ "type", "password" }})" @bind-Text="@password" Placeholder="Password" />
-                    </Field>
-                    <Field>
-                        <Check TValue="bool" @bind-Checked="@rememberMe">Remember Me</Check>
-                    </Field>
-                    <Text Color="TextColor.Danger">@loginMessage</Text>
-                </ModalBody>
-                <ModalFooter>
-                    <Button Disabled="string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(password)" Color="Color.Primary" Clicked="() => Login(userName, password)">Login</Button>
-                </ModalFooter>
-            </ModalContent>
-        </Modal>
-
-        <Modal @ref="incomingCallModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
-            <ModalBackdrop />
-            <ModalContent Centered="true">
-                <ModalBody>
-                    User @caller?.Name is calling you. Do you want to accept the call?
-                </ModalBody>
-                <ModalFooter>
-                    <Button Color="Color.Secondary" Clicked="DeclineCall">Decline</Button>
-                    <Button Color="Color.Success" Clicked="AcceptCall">Accept</Button>
-                </ModalFooter>
-            </ModalContent>
-        </Modal>
-
-        <div style="display: @(errorAlert ? "block" : "none")">
-            <Alert Color="Color.Danger" Visible="true">
-                <AlertMessage>Error!</AlertMessage>
-                <AlertDescription>@errorMessage</AlertDescription>
-                <CloseButton Clicked="() => errorAlert = false" />
-            </Alert>
-        </div>
-        <div style="display: @(deviceAccessAlert ? "block" : "none")">
-            <Alert Color="Color.Warning" Visible="true">
-                <AlertMessage>Note!</AlertMessage>
-                <AlertDescription>The browser should ask you to allow access to your camera and microphone. You need to accept that in order to use this site.</AlertDescription>
-                <CloseButton Clicked="() => deviceAccessAlert = false" />
-            </Alert>
-        </div>
-        <Row>
-            <Column ColumnSize="ColumnSize.IsAuto">
-                <Card>
-                    <CardBody>
-                        <CardTitle Size="5">Users Online</CardTitle>
-                        <CardText>
-                            @foreach (var user in usersList)
-                            {
-                            <div>
-                                <Icon Name="IconName.User" Margin="Margin.Is1"></Icon> @user.Name
-                                @if (user.Name != userName)
-                                {
-                                    if (state == State.Calling || state == State.InCall)
-                                    {
-                                        <Button Clicked="() => HangUp(user)" Margin="Margin.Is1" Color="Color.Danger" Size="ButtonSize.Small">Hang Up</Button>
-                                    }
-                                    else
-                                    {
-                                        <Button Clicked="() => Call(user)" Margin="Margin.Is1" Color="Color.Primary" Size="ButtonSize.Small">Call</Button>
-                                    }
-                                }
-                            </div>
-                            }
-                        </CardText>
-                    </CardBody>
-                </Card>
-            </Column>
-            <Column>
-                <Card>
-                    <CardBody>
-                        <CardTitle Size="5">You</CardTitle>
-                        <CardText>
-                            <video style="background-image: url('svg/@(state == State.Loading ? "puff" : (state == State.Error ? "times" : "user")).svg')" id="my-video" autoplay="autoplay"></video>
-                        </CardText>
-                    </CardBody>
-                </Card>
-            </Column>
-            <Column>
-                <Card>
-                    <CardBody>
-                        <CardTitle Size="5">Partner</CardTitle>
-                        <CardText>
-                            <video style="background-image: url('svg/@(state == State.Calling ? "puff" : "user").svg')" id="partner-video" autoplay="autoplay"></video>
-                        </CardText>
-                    </CardBody>
-                </Card>
-            </Column>
-        </Row>
+        @if (Me != null && !Me.IsAdmin)
+        {
+            <Chat @ref="chat" Me="@Me"></Chat>
+        }
     </LayoutContent>
 </Layout>
 
+<Modal @ref="loginModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
+    <ModalBackdrop />
+    <ModalContent Centered="true">
+        <ModalHeader>
+            <ModalTitle>Login</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+            <Field>
+                <FieldLabel>Name</FieldLabel>
+                <TextEdit @bind-Text="@userName" Placeholder="Name" />
+            </Field>
+            <Field>
+                <FieldLabel>Password</FieldLabel>
+                <TextEdit Attributes="@(new Dictionary<string, object>() {{ "type", "password" }})" @bind-Text="@password" Placeholder="Password" />
+            </Field>
+            <Field>
+                <Check TValue="bool" @bind-Checked="@rememberMe">Remember Me</Check>
+            </Field>
+            <Text Color="TextColor.Danger">@loginMessage</Text>
+        </ModalBody>
+        <ModalFooter>
+            <Button Disabled="string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(password)" Color="Color.Primary" Clicked="() => Login(userName, password)">Login</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
 @code {
-    State state;
-    Snackbar popup;
-    Modal loginModal, incomingCallModal;
+    Modal loginModal;
     string userName, password;
     bool rememberMe;
-    User caller, callee;
-    List<User> usersList = new List<User>();
-    bool errorAlert;
-    bool deviceAccessAlert = true;
-    User Me => usersList.FirstOrDefault(x => x.ConnectionId == HubService.ConnectionId);
+    string loginMessage;
 
-    string errorMessage, popupMessage, loginMessage;
+    User Me { get; set; }
+    Chat chat;
 
     protected override async Task OnInitializedAsync()
     {
-        HubService.OnUsersUpdated += (users) =>
+        var userInfo = await BrowserService.GetUser();
+
+        if (userInfo != null)
         {
-            usersList = users;
-            StateHasChanged();
-        };
-
-        HubService.OnCallDeclined += (message) =>
-        {
-            ShowPopup(FormatMessage(message));
-            Reset();
-        };
-
-        HubService.OnCallEnded += (message) =>
-        {
-            incomingCallModal.Hide();
-            ShowPopup(FormatMessage(message));
-            BrowserService.CloseConnection(message.User.ConnectionId);
-            Reset();
-        };
-
-        HubService.OnIncomingCall += (connectionId) =>
-        {
-            var user = usersList.SingleOrDefault(x => x.ConnectionId == connectionId);
-
-            if (user != null)
-            {
-                caller = user;
-                incomingCallModal.Show();
-            }
-        };
-
-        HubService.OnCallAccepted += (connectionId) =>
-        {
-            state = State.InCall;
-            BrowserService.InitiateOffer(connectionId);
-        };
-
-        BrowserService.OnLocalMediaAttached += (success) =>
-        {
-            if (success)
-            {
-                deviceAccessAlert = false;
-                state = State.Idle;
-            }
-            else
-            {
-                state = State.Error;
-                ShowError("Failed to get hardware access. Please make sure that another browser or program isn't using your camera/microphone.");
-                //ShowError("Your browser does not support WebRTC. Please install a modern browser such as Chrome or Firefox to use this site.");
-            }
-
-            StateHasChanged();
-        };
-
-        BrowserService.OnSendSignal += (string data, string connectionId) =>
-        {
-            HubService.SendSignal(data, connectionId);
-        };
-
-        HubService.OnSignalReceived += (connectionId, data) =>
-        {
-            BrowserService.ProcessSignal(connectionId, data);
-        };
-
-        var user = await BrowserService.GetUser();
-
-        if (user != null && await HubService.Login(user.Name, user.Password))
-        {
-            userName = user.Name;
-
-            state = State.Loading;
-            await BrowserService.Init();
+            Me = await HubService.Login(userInfo.Name, userInfo.Password);
         }
         else
         {
@@ -230,20 +81,17 @@
 
     async Task Login(string userName, string password)
     {
-        var loginSuccess = await HubService.Login(userName, password);
+        Me = await HubService.Login(userName, password);
 
-        if (loginSuccess)
+        if (Me != null)
         {
             loginMessage = null;
             loginModal.Hide();
 
             if (rememberMe)
             {
-                await BrowserService.SetUser(userName, password);
+                await BrowserService.SetUser(Me.Name, password);
             }
-
-            state = State.Loading;
-            await BrowserService.Init();
         }
         else
         {
@@ -253,86 +101,17 @@
 
     async Task Logout()
     {
-        if (state == State.Calling || state == State.InCall)
+        if (!Me.IsAdmin)
         {
-            await HubService.HangUp();
+            await chat?.Leave(); 
         }
 
-        await HubService.Leave();
-        await BrowserService.Reset();
         await BrowserService.RemoveUser();
 
-        Reset();
-
+        Me = null;
         loginModal.Show();
     }
 
-    async Task AcceptCall()
-    {
-        await HubService.AnswerCall(true, caller.ConnectionId);
-
-        state = State.InCall;
-        incomingCallModal.Hide();
-    }
-
-    async Task DeclineCall()
-    {
-        await HubService.AnswerCall(false, caller.ConnectionId);
-
-        incomingCallModal.Hide();
-        ShowPopup("Call declined");
-    }
-
-    void ShowError(string message)
-    {
-        errorMessage = message;
-        errorAlert = true;
-        deviceAccessAlert = false;
-    }
-
-    void ShowPopup(string message)
-    {
-        popupMessage = message;
-        popup.Show();
-    }
-
-    string FormatMessage(ActionMessage message)
-    {
-        var token = message.Action switch
-        {
-            UserAction.Decline => "declined your call",
-            UserAction.Leave => "has left",
-            UserAction.Busy => "is busy",
-            UserAction.HangUp => "hung up",
-            UserAction.Cancel => "cancelled the call",
-            _ => message.Action.ToString().ToLowerInvariant()
-        };
-
-        return $"{message.User.Name} {token}";
-    }
-
-    void Call(User user)
-    {
-        HubService.CallUser(user.ConnectionId);
-        callee = user;
-        state = State.Calling;
-    }
-
-    void HangUp(User user)
-    {
-        HubService.HangUp();
-        BrowserService.CloseConnection(user.ConnectionId);
-
-        Reset();
-    }
-
-    void Reset()
-    {
-        caller = null;
-        callee = null;
-        state = State.Idle;
-        StateHasChanged();
-    }
 
     public void Dispose()
     {

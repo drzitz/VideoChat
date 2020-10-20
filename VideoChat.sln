@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30524.135
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoChat.Server", "VideoChat\Server\VideoChat.Server.csproj", "{18A56173-CC2F-4A36-837E-FB0E3A93DFFD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VideoChat.Server", "VideoChat\Server\VideoChat.Server.csproj", "{18A56173-CC2F-4A36-837E-FB0E3A93DFFD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoChat.Client", "VideoChat\Client\VideoChat.Client.csproj", "{5D577877-0F09-4FBD-8DEF-4E82DF1E177F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VideoChat.Client", "VideoChat\Client\VideoChat.Client.csproj", "{5D577877-0F09-4FBD-8DEF-4E82DF1E177F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoChat.Shared", "VideoChat\Shared\VideoChat.Shared.csproj", "{82EE05CD-B9B2-443C-BE78-C1C059BC10E3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VideoChat.Shared", "VideoChat\Shared\VideoChat.Shared.csproj", "{82EE05CD-B9B2-443C-BE78-C1C059BC10E3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
