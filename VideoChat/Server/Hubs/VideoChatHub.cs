@@ -1,38 +1,35 @@
-﻿using Microsoft.AspNetCore.SignalR;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using VideoChat.Shared.Models;
-using VideoChat.Shared.Extensions;
-using System.Linq;
+﻿using JsonFlatFileDataStore;
+using Microsoft.AspNetCore.SignalR;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using VideoChat.Shared.Extensions;
+using VideoChat.Shared.Models;
 
 namespace VideoChat.Server.Hubs
 {
     public class VideoChatHub : Hub<IVideoChatClient>
     {
-        private static readonly List<User> Users = new List<User>();
+        private static readonly IDocumentCollection<User> Users = new DataStore("data.json").GetCollection<User>();
+
         private static readonly List<UserCall> UserCalls = new List<UserCall>();
         private static readonly List<CallOffer> CallOffers = new List<CallOffer>();
-
-        public async Task Join(string userName)
+        
+        public async Task<bool> Login(string userName, string password)
         {
-            var existing = Users.FirstOrDefault(x => x.Name == userName);
+            var user = Users.AsQueryable().FirstOrDefault(x => x.Name == userName && x.Password == password);
 
-            if (existing != null)
+            if (user != null)
             {
-                existing.Name = userName;
-                existing.ConnectionId = Context.ConnectionId;
-            }
-            else
-            {
-                Users.Add(new User
-                {
-                    Name = userName,
-                    ConnectionId = Context.ConnectionId
-                });
+                user.ConnectionId = Context.ConnectionId;
+                await Users.UpdateOneAsync(user.Id, user);
+                await SendUsersListUpdate();
+
+                return true;
             }
 
-            await SendUsersListUpdate();
+            return false;
         }
 
         public void CallUser(string connectionId)
@@ -186,7 +183,8 @@ namespace VideoChat.Server.Hubs
                 CallOffers.Remove(offer);
             }
 
-            Users.Remove(caller);
+            caller.ConnectionId = null;
+            await Users.UpdateOneAsync(caller.Id, caller);
             await SendUsersListUpdate();
 
             await base.OnDisconnectedAsync(exception);
@@ -195,7 +193,7 @@ namespace VideoChat.Server.Hubs
 
         private Task SendUsersListUpdate()
         {
-            return Clients.All.UpdateUsersList(Users.ToJson());
+            return Clients.All.UpdateUsersList(Users.AsQueryable().Where(x => !x.IsAdmin && x.IsOnline).ToJson());
         }
 
         private Task SendCallEnded(User to, User from, UserAction action)
@@ -210,12 +208,12 @@ namespace VideoChat.Server.Hubs
 
         private User GetCaller()
         {
-            return Users.SingleOrDefault(x => x.ConnectionId == Context.ConnectionId);
+            return Users.AsQueryable().SingleOrDefault(x => x.ConnectionId == Context.ConnectionId);
         }
 
         private User GetCallee(string connectionId)
         {
-            return Users.SingleOrDefault(x => x.ConnectionId == connectionId);
+            return Users.AsQueryable().SingleOrDefault(x => x.ConnectionId == connectionId);
         }
 
         private UserCall GetUserCall(string connectionId)

@@ -89,9 +89,9 @@ namespace VideoChat.Client.Services
             });
         }
 
-        public Task Join(string userName)
+        public Task<bool> Login(string userName, string password)
         {
-            return _hubConnection.SendAsync("Join", userName);
+            return _hubConnection.InvokeAsync<bool>("Login", userName, password);
         }
 
         public Task CallUser(string connectionId)

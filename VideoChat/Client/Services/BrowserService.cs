@@ -2,6 +2,7 @@
 using Microsoft.JSInterop;
 using System;
 using System.Threading.Tasks;
+using VideoChat.Client.Models;
 
 namespace VideoChat.Client.Services
 {
@@ -23,14 +24,14 @@ namespace VideoChat.Client.Services
             objRef = DotNetObjectReference.Create(this);
         }
 
-        public ValueTask<string> GetUserName()
+        public ValueTask<UserInfo> GetUser()
         {
-            return _localStorage.GetItemAsync<string>("userName");
+            return _localStorage.GetItemAsync<UserInfo>("User");
         }
 
-        public ValueTask SetUserName(string userName)
+        public ValueTask SetUser(string userName, string password)
         {
-            return _localStorage.SetItemAsync("userName", userName);
+            return _localStorage.SetItemAsync("User", new UserInfo { Name = userName, Password = password });
         }
 
         public ValueTask Init()

@@ -1,0 +1,34 @@
+{
+  "user": [
+    {
+      "id": 0,
+      "name": "Admin",
+      "password": "admin",
+      "balance": 0,
+      "isMale": false,
+      "isAdmin": true,
+      "canChat": false,
+      "connectionId": null
+    },
+    {
+      "id": 1,
+      "name": "Aleksandros",
+      "password": "99906ve",
+      "balance": 0,
+      "isMale": true,
+      "isAdmin": false,
+      "canChat": true,
+      "connectionId": null
+    },
+    {
+      "id": 2,
+      "name": "Violanta",
+      "password": "123321",
+      "balance": 0,
+      "isMale": false,
+      "isAdmin": false,
+      "canChat": true,
+      "connectionId": null
+    }
+  ]
+}

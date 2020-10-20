@@ -12,7 +12,7 @@
                 <BarEnd>
                     @if (!string.IsNullOrEmpty(userName))
                     {
-                        <BarItem @onclick="() => userNameModal.Show()">
+                        <BarItem>
                             <Icon Name="IconName.User" Margin="Margin.Is1"></Icon>@userName
                         </BarItem>
                     }
@@ -28,17 +28,28 @@
             </SnackbarBody>
         </Snackbar>
 
-        <Modal @ref="userNameModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
+        <Modal @ref="loginModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
             <ModalBackdrop />
             <ModalContent Centered="true">
-                <ModalHeader>Enter your name under which the other users will see you</ModalHeader>
+                <ModalHeader>
+                    <ModalTitle>Login</ModalTitle>
+                </ModalHeader>
                 <ModalBody>
                     <Field>
+                        <FieldLabel>Name</FieldLabel>
                         <TextEdit @bind-Text="@userName" Placeholder="Name" />
                     </Field>
+                    <Field>
+                        <FieldLabel>Password</FieldLabel>
+                        <TextEdit Attributes="@(new Dictionary<string, object>() {{ "type", "password" }})" @bind-Text="@password" Placeholder="Password" />
+                    </Field>
+                    <Field>
+                        <Check TValue="bool" @bind-Checked="@rememberMe">Remember Me</Check>
+                    </Field>
+                    <Text Color="TextColor.Danger">@loginMessage</Text>
                 </ModalBody>
                 <ModalFooter>
-                    <Button Disabled="string.IsNullOrEmpty(userName)" Color="Color.Primary" Clicked="Start">Start</Button>
+                    <Button Disabled="string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(password)" Color="Color.Primary" Clicked="() => Login(userName, password)">Login</Button>
                 </ModalFooter>
             </ModalContent>
         </Modal>
@@ -124,15 +135,15 @@
 @code {
     State state;
     Snackbar popup;
-    Modal userNameModal, incomingCallModal;
-    string userName;
+    Modal loginModal, incomingCallModal;
+    string userName, password;
+    bool rememberMe;
     User caller, callee;
     List<User> usersList = new List<User>();
     bool errorAlert;
     bool deviceAccessAlert = true;
 
-    string errorMessage;
-    string popupMessage;
+    string errorMessage, popupMessage, loginMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -200,30 +211,42 @@
             BrowserService.ProcessSignal(connectionId, data);
         };
 
-        userName = await BrowserService.GetUserName();
+        var user = await BrowserService.GetUser();
 
-        if (string.IsNullOrEmpty(userName))
+        if (user != null && await HubService.Login(user.Name, user.Password))
         {
-            userNameModal.Show();
+            userName = user.Name;
+
+            state = State.Loading;
+            await BrowserService.Init();
         }
         else
         {
-            await Join();
+            loginModal.Show();
         }
     }
 
-    async Task Start()
+    async Task Login(string userName, string password)
     {
-        userNameModal.Hide();
-        await BrowserService.SetUserName(userName);
-        await Join();
-    }
+        var loginSuccess = await HubService.Login(userName, password);
 
-    async Task Join()
-    {
-        await HubService.Join(userName);
-        state = State.Loading;
-        await BrowserService.Init();
+        if (loginSuccess)
+        {
+            loginMessage = null;
+            loginModal.Hide();
+
+            if (rememberMe)
+            {
+                await BrowserService.SetUser(userName, password);
+            }
+
+            state = State.Loading;
+            await BrowserService.Init();
+        }
+        else
+        {
+            loginMessage = "Login failed: invalid user name or password";
+        }
     }
 
     async Task AcceptCall()

@@ -1,10 +1,27 @@
-﻿namespace VideoChat.Shared.Models
+﻿using Newtonsoft.Json;
+
+namespace VideoChat.Shared.Models
 {
     public class User
     {
-        public string Name;
-        public string ConnectionId;
-        public bool InCall;
+        public int Id { get; set; }
+
+        public string Name { get; set; }
+
+        public string Password { get; set; }
+
+        public int Balance { get; set; }
+
+        public bool IsMale { get; set; }
+
+        public bool IsAdmin { get; set; }
+
+        public bool CanChat { get; set; }
+
+        public string ConnectionId { get; set; }
+
+        [JsonIgnore]
+        public bool IsOnline => ConnectionId != null;
 
         public static bool operator ==(User u1, User u2)
         {
