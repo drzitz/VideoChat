@@ -12,8 +12,8 @@
     },
     {
       "id": 1,
-      "name": "Aleksandros",
-      "password": "99906ve",
+      "name": "Alex",
+      "password": "123321",
       "balance": 0,
       "isMale": true,
       "isAdmin": false,
@@ -22,7 +22,7 @@
     },
     {
       "id": 2,
-      "name": "Violanta",
+      "name": "Elena",
       "password": "123321",
       "balance": 0,
       "isMale": false,

@@ -26,17 +26,17 @@ namespace VideoChat.Client.Services
 
         public ValueTask<UserInfo> GetUser()
         {
-            return _localStorage.GetItemAsync<UserInfo>("User");
+            return _localStorage.GetItemAsync<UserInfo>("user");
         }
 
         public ValueTask SetUser(string userName, string password)
         {
-            return _localStorage.SetItemAsync("User", new UserInfo { Name = userName, Password = password });
+            return _localStorage.SetItemAsync("user", new UserInfo { Name = userName, Password = password });
         }
 
         public ValueTask RemoveUser()
         {
-            return _localStorage.RemoveItemAsync("User");
+            return _localStorage.RemoveItemAsync("user");
         }
 
         public ValueTask Init()
