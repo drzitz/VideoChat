@@ -13,12 +13,16 @@ namespace VideoChat.Client.Services
         private readonly HubConnection _hubConnection;
         private readonly NavigationManager _navigationManager;
 
-        public event Action<List<User>> OnUsersUpdated;
+        public event Action<List<User>> OnOnlineUsersUpdated;
         public event Action<string> OnIncomingCall;
         public event Action<string> OnCallAccepted;
         public event Action<ActionMessage> OnCallDeclined;
         public event Action<ActionMessage> OnCallEnded;
         public event Action<string, string> OnSignalReceived;
+
+        public event Action<ServerAction> OnCallAborted;
+        public event Action<List<User>> OnUsersUpdated;
+        public event Action<List<UserCall>> OnCallsUpdated;
 
         public HubService(NavigationManager navigationManager)
         {
@@ -58,9 +62,9 @@ namespace VideoChat.Client.Services
 
         private void InitHubEvents()
         {
-            _hubConnection.On<string>("UpdateUsersList", (message) =>
+            _hubConnection.On<string>("UpdateOnlineUsers", (message) =>
             {
-                OnUsersUpdated?.Invoke(message.FromJson<List<User>>());
+                OnOnlineUsersUpdated?.Invoke(message.FromJson<List<User>>());
             });
 
             _hubConnection.On<string>("IncomingCall", (connectionId) =>
@@ -87,6 +91,22 @@ namespace VideoChat.Client.Services
             {
                 OnSignalReceived?.Invoke(connectionId, data);
             });
+
+
+            _hubConnection.On<string>("UpdateUsers", (message) =>
+            {
+                OnUsersUpdated?.Invoke(message.FromJson<List<User>>());
+            });
+
+            _hubConnection.On<string>("UpdateCalls", (message) =>
+            {
+                OnCallsUpdated?.Invoke(message.FromJson<List<UserCall>>());
+            });
+
+            _hubConnection.On<string>("CallAborted", (message) =>
+            {
+                OnCallAborted?.Invoke(Enum.Parse<ServerAction>(message));
+            });
         }
 
         public Task<User> Login(string userName, string password)
@@ -94,9 +114,19 @@ namespace VideoChat.Client.Services
             return _hubConnection.InvokeAsync<User>("Login", userName, password);
         }
 
-        public async Task<List<User>> GetOnlineUsers()
+        public Task<List<User>> GetUsers()
         {
-            return await _hubConnection.InvokeAsync<List<User>>("GetOnlineUsers");
+            return _hubConnection.InvokeAsync<List<User>>("GetUsers");
+        }
+
+        public Task<List<User>> GetOnlineUsers()
+        {
+            return _hubConnection.InvokeAsync<List<User>>("GetOnlineUsers");
+        }
+
+        public Task<List<UserCall>> GetCalls()
+        {
+            return _hubConnection.InvokeAsync<List<UserCall>>("GetCalls");
         }
 
         public Task CallUser(string connectionId)
@@ -122,6 +152,21 @@ namespace VideoChat.Client.Services
         public Task SendSignal(string signal, string connectionId)
         {
             return _hubConnection.SendAsync("SendSignal", signal, connectionId);
+        }
+
+        public Task AbortCall(string callId)
+        {
+            return _hubConnection.SendAsync("AbortCall", callId);
+        }
+
+        public Task AbortAllCalls()
+        {
+            return _hubConnection.SendAsync("AbortAllCalls");
+        }
+
+        public Task<bool> UpdateUser(int id, int balance, bool canChat)
+        {
+            return _hubConnection.InvokeAsync<bool>("UpdateUser", id, balance, canChat);
         }
 
         public Task Dispose()

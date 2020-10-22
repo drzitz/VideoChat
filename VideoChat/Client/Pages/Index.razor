@@ -23,9 +23,16 @@
         <hr />
     </LayoutHeader>
     <LayoutContent Margin="Margin.Is3">
-        @if (Me != null && !Me.IsAdmin)
+        @if (Me != null)
         {
-            <Chat @ref="chat" Me="@Me"></Chat>
+            if (Me.IsAdmin)
+            {
+                <Admin OnMessage="ShowPopup" />
+            }
+            else
+            {
+                <Chat OnMessage="ShowPopup" @ref="chat" Me="@Me"></Chat>
+            }
         }
     </LayoutContent>
 </Layout>
@@ -56,11 +63,19 @@
     </ModalContent>
 </Modal>
 
+<Snackbar @ref="popup" Color="SnackbarColor.Danger" Location="SnackbarLocation.Right" Interval="5000">
+    <SnackbarBody>
+        @popupMessage
+    </SnackbarBody>
+</Snackbar>
+
 @code {
     Modal loginModal;
+    Snackbar popup;
+
     string userName, password;
     bool rememberMe;
-    string loginMessage;
+    string loginMessage, popupMessage;
 
     User Me { get; set; }
     Chat chat;
@@ -103,13 +118,19 @@
     {
         if (!Me.IsAdmin)
         {
-            await chat?.Leave(); 
+            await chat?.Leave();
         }
 
         await BrowserService.RemoveUser();
 
         Me = null;
         loginModal.Show();
+    }
+
+    void ShowPopup(string message)
+    {
+        popupMessage = message;
+        popup.Show();
     }
 
 

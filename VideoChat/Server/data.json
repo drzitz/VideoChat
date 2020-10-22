@@ -14,7 +14,7 @@
       "id": 1,
       "name": "Alex",
       "password": "123321",
-      "balance": 0,
+      "balance": 10,
       "isMale": true,
       "isAdmin": false,
       "canChat": true,

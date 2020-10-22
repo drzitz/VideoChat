@@ -2,7 +2,7 @@
 {
     public class CallOffer
     {
-        public User Caller;
-        public User Callee;
+        public User Caller { get; set; }
+        public User Callee { get; set; }
     }
 }

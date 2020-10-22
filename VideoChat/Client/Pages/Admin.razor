@@ -1,0 +1,179 @@
+﻿@inject HubService HubService
+
+<Row>
+    <Column ColumnSize="ColumnSize.IsHalf">
+        <Card>
+            <CardHeader>
+                <CardTitle Margin="Margin.Is0" Size="5">Users</CardTitle>
+            </CardHeader>
+            <CardBody Padding="Padding.Is0">
+                <CardText>
+                    <Table Margin="Margin.Is0">
+                        <TableHeader>
+                            <TableRow>
+                                <TableHeaderCell>Id</TableHeaderCell>
+                                <TableHeaderCell>Name</TableHeaderCell>
+                                <TableHeaderCell>Balance</TableHeaderCell>
+                                <TableHeaderCell>Can Chat</TableHeaderCell>
+                                <TableHeaderCell></TableHeaderCell>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            @foreach (var user in users)
+                            {
+                                <TableRow>
+                                    <TableRowCell>@user.Id</TableRowCell>
+                                    <TableRowCell><Icon Name="@(user.IsMale ? "fa-male" : "fa-female")" Margin="Margin.Is2" />@user.Name</TableRowCell>
+                                    <TableRowCell>@(user.IsMale ? user.Balance.ToString() : string.Empty)</TableRowCell>
+                                    <TableRowCell>@(user.CanChat ? "Yes" : "No")</TableRowCell>
+                                    <TableRowCell><Button Color="Color.Primary" Size="ButtonSize.Small" Clicked="() => EditUser(user)">Edit</Button></TableRowCell>
+                                </TableRow>
+                            }
+                        </TableBody>
+                    </Table>
+                </CardText>
+            </CardBody>
+        </Card>
+    </Column>
+    <Column ColumnSize="ColumnSize.IsHalf">
+        <Card>
+            <CardHeader>
+                <CardTitle Margin="Margin.Is0" Size="5">Chats</CardTitle>
+            </CardHeader>
+            <CardBody Padding="Padding.Is0">
+                <CardText>
+                    <Table Margin="Margin.Is0">
+                        <TableHeader>
+                            <TableRow>
+                                <TableHeaderCell>Participants</TableHeaderCell>
+                                <TableHeaderCell>Started</TableHeaderCell>
+                                <TableHeaderCell>Duration</TableHeaderCell>
+                                <TableHeaderCell></TableHeaderCell>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            @foreach (var call in calls)
+                            {
+                                <TableRow>
+                                    <TableRowCell>
+                                        <Icon Name="@GetIconName(call.Caller)" Margin="Margin.Is2" />@call.Caller.Name
+                                        <Icon Name="@("fa-arrows-alt-h")" Margin="Margin.Is2" />
+                                        <Icon Name="@GetIconName(call.Callee)" Margin="Margin.Is2" />@call.Callee.Name
+                                    </TableRowCell>
+                                    <TableRowCell>@call.Started.ToLocalTime().ToString("dd/MM hh:mm tt")</TableRowCell>
+                                    <TableRowCell>@(Convert.ToInt32((DateTime.UtcNow - call.Started).TotalMinutes)) min</TableRowCell>
+                                    <TableRowCell><Button Color="Color.Primary" Size="ButtonSize.Small" Clicked="() => AbortCall(call)">Abort</Button></TableRowCell>
+                                </TableRow>
+                            }
+                            @if (!calls.Any())
+                            {
+                                <TableRow>
+                                    <TableRowCell>There are no active connections now</TableRowCell>
+                                </TableRow>
+                            }
+                        </TableBody>
+                    </Table>
+                </CardText>
+            </CardBody>
+        </Card>
+        <Button Color="Color.Primary" Size="ButtonSize.Small" Clicked="AbortAllCalls" Margin="Margin.Is3.OnY">Abort All</Button>
+    </Column>
+</Row>
+
+<Modal @ref="userEditModal">
+    <ModalBackdrop />
+    <ModalContent Centered="true">
+        <ModalHeader>
+            <ModalTitle>Edit user</ModalTitle>
+            <CloseButton Clicked="() => userEditModal.Hide()" />
+        </ModalHeader>
+        <ModalBody>
+            @if (selectedUser != null)
+            {
+                <Field>
+                    <FieldLabel>Name</FieldLabel>
+                    <TextEdit ReadOnly="true" Text="@selectedUser.Name"></TextEdit>
+                </Field>
+                @if (selectedUser.IsMale)
+                {
+                    <Field>
+                        <FieldLabel>Balance</FieldLabel>
+                        <NumericEdit @bind-Value="balance"></NumericEdit>
+                        <small class="form-text text-muted">If the male user's balance is zero, they can't call or be called</small>
+                    </Field>
+                }
+                <Field>
+                    <Check TValue="bool" @bind-Checked="@canChat">Can Chat</Check>
+                    <small class="form-text text-muted">If unchecked, the user can't chat regardless of gender or balance</small>
+                </Field>
+            }
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="() => userEditModal.Hide()">Cancel</Button>
+            <Button Color="Color.Success" Clicked="UpdateUser">Update</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnMessage { get; set; }
+
+    Modal userEditModal;
+
+    List<User> users = new List<User>();
+    List<UserCall> calls = new List<UserCall>();
+
+    User selectedUser;
+    int balance;
+    bool canChat;
+
+    protected override async Task OnInitializedAsync()
+    {
+        HubService.OnUsersUpdated += (allUsers) =>
+        {
+            users = allUsers;
+            StateHasChanged();
+        };
+
+        HubService.OnCallsUpdated += (userCalls) =>
+        {
+            calls = userCalls;
+            StateHasChanged();
+        };
+
+        users = await HubService.GetUsers();
+        calls = await HubService.GetCalls();
+    }
+
+    void EditUser(User user)
+    {
+        selectedUser = user;
+        balance = selectedUser.Balance;
+        canChat = selectedUser.CanChat;
+        userEditModal.Show();
+    }
+
+    Task AbortCall(UserCall call)
+    {
+        return HubService.AbortCall(call.Id);
+    }
+
+    Task AbortAllCalls()
+    {
+        return HubService.AbortAllCalls();
+    }
+
+    async Task UpdateUser()
+    {
+        var result = await HubService.UpdateUser(selectedUser.Id, balance, canChat);
+        userEditModal.Hide();
+
+        if (!result)
+        {
+            _ = OnMessage.InvokeAsync("User update failed");
+        }
+    }
+
+    string GetIconName(User user) => user.IsMale ? "fa-male" : "fa-female";
+}

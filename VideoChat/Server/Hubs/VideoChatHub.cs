@@ -15,7 +15,7 @@ namespace VideoChat.Server.Hubs
 
         private static readonly List<UserCall> UserCalls = new List<UserCall>();
         private static readonly List<CallOffer> CallOffers = new List<CallOffer>();
-        
+
         public async Task<User> Login(string userName, string password)
         {
             var user = Users.AsQueryable().FirstOrDefault(x => string.Equals(x.Name, userName, StringComparison.InvariantCultureIgnoreCase) && x.Password == password);
@@ -30,10 +30,25 @@ namespace VideoChat.Server.Hubs
             return user;
         }
 
+        public List<User> GetUsers()
+        {
+            return Users.AsQueryable().Where(x => !x.IsAdmin).ToList();
+        }
+
         public List<User> GetOnlineUsers()
         {
             return Users.AsQueryable().Where(x => !x.IsAdmin && x.IsOnline).ToList();
         }
+
+        public List<UserCall> GetCalls() => UserCalls;
+
+        //public List<UserCall> GetCalls()
+        //{
+        //    var alex = Users.AsQueryable().FirstOrDefault(x => x.Id == 1);
+        //    var elena = Users.AsQueryable().FirstOrDefault(x => x.Id == 2);
+
+        //    return new List<UserCall> { new UserCall { Caller = alex, Callee = elena, Started = DateTime.UtcNow.AddHours(-1), Confirmed = DateTime.UtcNow } };
+        //}
 
         public void CallUser(string connectionId)
         {
@@ -60,12 +75,12 @@ namespace VideoChat.Server.Hubs
                 Callee = callee
             });
         }
-        
+
         public void AnswerCall(bool accept, string connectionId)
         {
             var caller = GetUser(connectionId);
             var callee = GetUser();
-            
+
             if (callee == null)
             {
                 return;
@@ -100,12 +115,17 @@ namespace VideoChat.Server.Hubs
 
             UserCalls.Add(new UserCall
             {
-                Users = new List<User> { callee, caller }
+                Users = new List<User> { caller, callee },
+                Caller = caller,
+                Callee = callee,
+                Started = DateTime.UtcNow,
+                Confirmed = DateTime.UtcNow
             });
 
             Clients.Client(connectionId).CallAccepted(callee.ConnectionId);
 
             SendOnlineUsers();
+            SendCalls();
         }
 
         public void HangUp()
@@ -131,13 +151,14 @@ namespace VideoChat.Server.Hubs
                 if (currentCall.Users.Count < 2)
                 {
                     UserCalls.Remove(currentCall);
+                    SendCalls();
                 }
             }
 
             foreach (var offer in CallOffers.Where(x => x.Caller == user).ToArray())
             {
                 SendCallEnded(offer.Callee, user, UserAction.Cancel);
-                CallOffers.Remove(offer); 
+                CallOffers.Remove(offer);
             }
 
             SendOnlineUsers();
@@ -158,6 +179,7 @@ namespace VideoChat.Server.Hubs
                 _ = SendCallEnded(otherUser, user, UserAction.Leave);
 
                 UserCalls.Remove(call);
+                await SendCalls();
             }
 
             foreach (var offer in CallOffers.Where(x => x.Caller == user || x.Callee == user).ToArray())
@@ -191,6 +213,58 @@ namespace VideoChat.Server.Hubs
             }
         }
 
+
+        public void AbortCall(string callId)
+        {
+            var call = UserCalls.FirstOrDefault(x => x.Id == callId);
+
+            if (call != null)
+            {
+                SendCallAborted(call.Caller, ServerAction.Admin);
+                SendCallAborted(call.Callee, ServerAction.Admin);
+            }
+
+            UserCalls.Remove(call);
+            SendCalls();
+        }
+
+        public void AbortAllCalls()
+        {
+            foreach (var call in UserCalls.ToArray())
+            {
+                SendCallAborted(call.Caller, ServerAction.Admin);
+                SendCallAborted(call.Callee, ServerAction.Admin);
+                UserCalls.Remove(call);
+            }
+
+            SendCalls();
+        }
+
+        public async Task<bool> UpdateUser(int id, int balance, bool canChat)
+        {
+            try
+            {
+                var user = Users.AsQueryable().FirstOrDefault(x => x.Id == id);
+
+                if (user == null)
+                {
+                    return false;
+                }
+
+                user.Balance = balance;
+                user.CanChat = canChat;
+
+                await Users.UpdateOneAsync(id, user);
+                await SendUsers();
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public override async Task OnDisconnectedAsync(Exception exception)
         {
             await Leave();
@@ -212,6 +286,23 @@ namespace VideoChat.Server.Hubs
         {
             return Clients.Client(to.ConnectionId).CallDeclined(new ActionMessage { User = from, Action = action }.ToJson());
         }
+
+
+        private Task SendUsers()
+        {
+            return Clients.All.UpdateUsers(Users.AsQueryable().Where(x => !x.IsAdmin).ToJson());
+        }
+
+        private Task SendCalls()
+        {
+            return Clients.All.UpdateCalls(UserCalls.ToJson());
+        }
+
+        private Task SendCallAborted(User to, ServerAction action)
+        {
+            return Clients.Client(to.ConnectionId).CallAborted(action.ToString());
+        }
+
 
         private User GetUser(string connectionId = null)
         {

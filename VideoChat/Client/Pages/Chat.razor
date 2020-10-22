@@ -1,12 +1,6 @@
 ﻿@inject HubService HubService
 @inject BrowserService BrowserService
 
-<Snackbar @ref="popup" Color="SnackbarColor.Danger" Location="SnackbarLocation.Right" Interval="5000">
-    <SnackbarBody>
-        @popupMessage
-    </SnackbarBody>
-</Snackbar>
-
 <Modal @ref="incomingCallModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
     <ModalBackdrop />
     <ModalContent Centered="true">
@@ -34,13 +28,14 @@
         <CloseButton Clicked="() => deviceAccessAlert = false" />
     </Alert>
 </div>
+
 <Row>
     <Column ColumnSize="ColumnSize.IsAuto">
         <Card>
             <CardBody>
                 <CardTitle Size="5">Users Online</CardTitle>
                 <CardText>
-                    @foreach (var user in usersList)
+                    @foreach (var user in users)
                     {
                         <div>
                             <Icon Name="IconName.User" Margin="Margin.Is1"></Icon> @user.Name
@@ -87,40 +82,42 @@
     [Parameter]
     public User Me { get; set; }
 
+    [Parameter]
+    public EventCallback<string> OnMessage { get; set; }
+
     Modal incomingCallModal;
     User caller, callee;
     State state;
-    Snackbar popup;
     bool errorAlert;
     bool deviceAccessAlert = true;
-    List<User> usersList = new List<User>();
-    string errorMessage, popupMessage;
+    List<User> users = new List<User>();
+    string errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
-        HubService.OnUsersUpdated += (users) =>
+        HubService.OnOnlineUsersUpdated += (onlineUsers) =>
         {
-            usersList = users;
+            users = onlineUsers;
             StateHasChanged();
         };
 
         HubService.OnCallDeclined += (message) =>
         {
-            ShowPopup(FormatMessage(message));
+            OnMessage.InvokeAsync(FormatMessage(message));
             Reset();
         };
 
         HubService.OnCallEnded += (message) =>
         {
             incomingCallModal.Hide();
-            ShowPopup(FormatMessage(message));
+            OnMessage.InvokeAsync(FormatMessage(message));
             BrowserService.CloseConnection(message.User.ConnectionId);
             Reset();
         };
 
         HubService.OnIncomingCall += (connectionId) =>
         {
-            var user = usersList.SingleOrDefault(x => x.ConnectionId == connectionId);
+            var user = users.SingleOrDefault(x => x.ConnectionId == connectionId);
 
             if (user != null)
             {
@@ -133,6 +130,18 @@
         {
             state = State.InCall;
             BrowserService.InitiateOffer(connectionId);
+        };
+
+        HubService.OnCallAborted += (action) =>
+        {
+            var token = action switch
+            {
+                ServerAction.NoCredits => "due to insufficient credits",
+                ServerAction.Admin => "by server administrator",
+                _ => string.Empty
+            };
+
+            OnMessage.InvokeAsync($"Session aborted {token}");
         };
 
         BrowserService.OnLocalMediaAttached += (success) =>
@@ -162,7 +171,7 @@
             BrowserService.ProcessSignal(connectionId, data);
         };
 
-        usersList = await HubService.GetOnlineUsers();
+        users = await HubService.GetOnlineUsers();
 
         state = State.Loading;
         await BrowserService.Init();
@@ -196,7 +205,7 @@
         await HubService.AnswerCall(false, caller.ConnectionId);
 
         incomingCallModal.Hide();
-        ShowPopup("Call declined");
+        _ = OnMessage.InvokeAsync("Call declined");
     }
 
     void ShowError(string message)
@@ -204,12 +213,6 @@
         errorMessage = message;
         errorAlert = true;
         deviceAccessAlert = false;
-    }
-
-    void ShowPopup(string message)
-    {
-        popupMessage = message;
-        popup.Show();
     }
 
     string FormatMessage(ActionMessage message)
