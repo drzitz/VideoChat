@@ -1,4 +1,5 @@
-﻿@inject HubService HubService
+﻿@page "/"
+@inject HubService HubService
 @inject BrowserService BrowserService
 
 <Modal @ref="incomingCallModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
@@ -39,7 +40,7 @@
                     {
                         <div>
                             <Icon Name="IconName.User" Margin="Margin.Is1"></Icon> @user.Name
-                            @if (user != Me)
+                            @if (user != Layout.Me)
                             {
                                 if (state == State.Calling || state == State.InCall)
                                 {
@@ -79,11 +80,8 @@
 </Row>
 
 @code {
-    [Parameter]
-    public User Me { get; set; }
-
-    [Parameter]
-    public EventCallback<string> OnMessage { get; set; }
+    [CascadingParameter]
+    MainLayout Layout { get; set; }
 
     Modal incomingCallModal;
     User caller, callee;
@@ -103,14 +101,14 @@
 
         HubService.OnCallDeclined += (message) =>
         {
-            OnMessage.InvokeAsync(FormatMessage(message));
+            Layout.ShowPopup(FormatMessage(message));
             Reset();
         };
 
         HubService.OnCallEnded += (message) =>
         {
             incomingCallModal.Hide();
-            OnMessage.InvokeAsync(FormatMessage(message));
+            Layout.ShowPopup(FormatMessage(message));
             BrowserService.CloseConnection(message.User.ConnectionId);
             Reset();
         };
@@ -141,7 +139,7 @@
                 _ => string.Empty
             };
 
-            OnMessage.InvokeAsync($"Session aborted {token}");
+            Layout.ShowPopup($"Session aborted {token}");
         };
 
         BrowserService.OnLocalMediaAttached += (success) =>
@@ -205,7 +203,7 @@
         await HubService.AnswerCall(false, caller.ConnectionId);
 
         incomingCallModal.Hide();
-        _ = OnMessage.InvokeAsync("Call declined");
+        Layout.ShowPopup("Call declined");
     }
 
     void ShowError(string message)
@@ -236,18 +234,5 @@
         callee = null;
         state = State.Idle;
         StateHasChanged();
-    }
-
-    public async Task Leave()
-    {
-        if (state == State.Calling || state == State.InCall)
-        {
-            await HubService.HangUp();
-        }
-
-        await BrowserService.Reset();
-        await HubService.Leave();
-
-        Reset();
     }
 }

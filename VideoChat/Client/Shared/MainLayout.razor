@@ -1,9 +1,140 @@
 ﻿@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject HubService HubService
+@inject BrowserService BrowserService
+@implements IDisposable
 
-<div class="top">
-    
-</div>
+<Layout>
+    <LayoutHeader>
+        <Bar Breakpoint="Breakpoint.Desktop" Background="Background.Light">
+            <BarBrand>Video Chat</BarBrand>
+            <BarMenu>
+                <BarStart>Hub: @HubService.State</BarStart>
+                <BarEnd>
+                    @if (Me != null)
+                    {
+                        <BarItem>
+                            <Icon Name="IconName.User" Margin="Margin.Is1"></Icon>@Me.Name
+                            <Button Margin="Margin.Is1" Size="ButtonSize.Small" Color="Color.Warning" Clicked="Logout">Logout</Button>
+                        </BarItem>
+                    }
+                </BarEnd>
+            </BarMenu>
+        </Bar>
+        <hr />
+    </LayoutHeader>
+    <LayoutContent Margin="Margin.Is3">
+        @if (Me != null)
+        {
+            <CascadingValue Value="this">
+                @Body
+            </CascadingValue>
+        }
+    </LayoutContent>
+</Layout>
 
-<div class="main">
-    @Body
-</div>
+<Modal @ref="loginModal" Closing="(e) => e.Cancel = e.CloseReason != CloseReason.UserClosing">
+    <ModalBackdrop />
+    <ModalContent Centered="true">
+        <ModalHeader>
+            <ModalTitle>Login</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+            <Field>
+                <FieldLabel>Name</FieldLabel>
+                <TextEdit @bind-Text="@userName" Placeholder="Name" />
+            </Field>
+            <Field>
+                <FieldLabel>Password</FieldLabel>
+                <TextEdit Attributes="@(new Dictionary<string, object>() {{ "type", "password" }})" @bind-Text="@password" Placeholder="Password" />
+            </Field>
+            <Field>
+                <Check TValue="bool" @bind-Checked="@rememberMe">Remember Me</Check>
+            </Field>
+            <Text Color="TextColor.Danger">@loginMessage</Text>
+        </ModalBody>
+        <ModalFooter>
+            <Button Disabled="string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(password)" Color="Color.Primary" Clicked="() => Login(userName, password)">Login</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+<Snackbar @ref="popup" Color="SnackbarColor.Danger" Location="SnackbarLocation.Right" Interval="5000">
+    <SnackbarBody>
+        @popupMessage
+    </SnackbarBody>
+</Snackbar>
+
+@code {
+    public User Me { get; set; }
+
+    Modal loginModal;
+    Snackbar popup;
+
+    string userName, password;
+    bool rememberMe;
+    string loginMessage, popupMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userInfo = await BrowserService.GetUser();
+        Me = userInfo != null ? await HubService.Login(userInfo.Name, userInfo.Password) : null;
+
+        if (Me != null)
+        {
+            NavigationManager.NavigateTo(Me.IsAdmin ? "/admin" : "/");
+        }
+        else
+        {
+            loginModal.Show();
+        }
+    }
+
+    async Task Login(string userName, string password)
+    {
+        Me = await HubService.Login(userName, password);
+
+        if (Me != null)
+        {
+            loginMessage = null;
+            loginModal.Hide();
+
+            if (rememberMe)
+            {
+                await BrowserService.SetUser(Me.Name, password);
+            }
+
+            NavigationManager.NavigateTo(Me.IsAdmin ? "/admin" : "/");
+        }
+        else
+        {
+            loginMessage = "Login failed: invalid user name or password";
+        }
+    }
+
+    async Task Logout()
+    {
+        if (!Me.IsAdmin)
+        {
+            await HubService.Leave();
+            await BrowserService.Reset();
+        }
+
+        await BrowserService.RemoveUser();
+
+        Me = null;
+        loginModal.Show();
+    }
+
+    public void ShowPopup(string message)
+    {
+        popupMessage = message;
+        popup.Show();
+    }
+
+
+    public void Dispose()
+    {
+        _ = HubService.Dispose();
+    }
+}
