@@ -16,11 +16,11 @@ namespace VideoChat.Client.Services
         public event Action<List<User>> OnOnlineUsersUpdated;
         public event Action<string> OnIncomingCall;
         public event Action<string> OnCallAccepted;
-        public event Action<ActionMessage> OnCallDeclined;
-        public event Action<ActionMessage> OnCallEnded;
+        public event Action<UserActionMessage> OnCallDeclined;
+        public event Action<UserActionMessage> OnCallEnded;
         public event Action<string, string> OnSignalReceived;
 
-        public event Action<ServerAction> OnCallAborted;
+        public event Action<ServerActionMessage> OnCallAborted;
         public event Action<List<User>> OnUsersUpdated;
         public event Action<List<UserCall>> OnCallsUpdated;
 
@@ -79,12 +79,12 @@ namespace VideoChat.Client.Services
 
             _hubConnection.On<string>("CallDeclined", (message) =>
             {
-                OnCallDeclined?.Invoke(message.FromJson<ActionMessage>());
+                OnCallDeclined?.Invoke(message.FromJson<UserActionMessage>());
             });
 
             _hubConnection.On<string>("CallEnded", (message) =>
             {
-                OnCallEnded?.Invoke(message.FromJson<ActionMessage>());
+                OnCallEnded?.Invoke(message.FromJson<UserActionMessage>());
             });
 
             _hubConnection.On<string, string>("ReceiveSignal", (connectionId, data) =>
@@ -105,7 +105,7 @@ namespace VideoChat.Client.Services
 
             _hubConnection.On<string>("CallAborted", (message) =>
             {
-                OnCallAborted?.Invoke(Enum.Parse<ServerAction>(message));
+                OnCallAborted?.Invoke(message.FromJson<ServerActionMessage>());
             });
         }
 

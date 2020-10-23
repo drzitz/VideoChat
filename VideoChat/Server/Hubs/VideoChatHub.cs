@@ -220,8 +220,8 @@ namespace VideoChat.Server.Hubs
 
             if (call != null)
             {
-                SendCallAborted(call.Caller, ServerAction.Admin);
-                SendCallAborted(call.Callee, ServerAction.Admin);
+                SendCallAborted(call.Caller, call.Callee, ServerAction.Admin);
+                SendCallAborted(call.Callee, call.Caller, ServerAction.Admin);
             }
 
             UserCalls.Remove(call);
@@ -232,8 +232,8 @@ namespace VideoChat.Server.Hubs
         {
             foreach (var call in UserCalls.ToArray())
             {
-                SendCallAborted(call.Caller, ServerAction.Admin);
-                SendCallAborted(call.Callee, ServerAction.Admin);
+                SendCallAborted(call.Caller, call.Callee, ServerAction.Admin);
+                SendCallAborted(call.Callee, call.Caller, ServerAction.Admin);
                 UserCalls.Remove(call);
             }
 
@@ -279,12 +279,12 @@ namespace VideoChat.Server.Hubs
 
         private Task SendCallEnded(User to, User from, UserAction action)
         {
-            return Clients.Client(to.ConnectionId).CallEnded(new ActionMessage { User = from, Action = action }.ToJson());
+            return Clients.Client(to.ConnectionId).CallEnded(new UserActionMessage { User = from, Action = action }.ToJson());
         }
 
         private Task SendCallDeclined(User to, User from, UserAction action)
         {
-            return Clients.Client(to.ConnectionId).CallDeclined(new ActionMessage { User = from, Action = action }.ToJson());
+            return Clients.Client(to.ConnectionId).CallDeclined(new UserActionMessage { User = from, Action = action }.ToJson());
         }
 
 
@@ -298,9 +298,9 @@ namespace VideoChat.Server.Hubs
             return Clients.All.UpdateCalls(UserCalls.ToJson());
         }
 
-        private Task SendCallAborted(User to, ServerAction action)
+        private Task SendCallAborted(User to, User from, ServerAction action)
         {
-            return Clients.Client(to.ConnectionId).CallAborted(action.ToString());
+            return Clients.Client(to.ConnectionId).CallAborted(new ServerActionMessage { User = from, Action = action }.ToJson());
         }
 
 

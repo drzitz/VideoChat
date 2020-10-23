@@ -101,15 +101,15 @@
 
         HubService.OnCallDeclined += (message) =>
         {
-            Layout.ShowPopup(FormatMessage(message));
+            Layout.ShowPopup(FormatUserAction(message));
             Reset();
         };
 
         HubService.OnCallEnded += (message) =>
         {
             incomingCallModal.Hide();
-            Layout.ShowPopup(FormatMessage(message));
             BrowserService.CloseConnection(message.User.ConnectionId);
+            Layout.ShowPopup(FormatUserAction(message));
             Reset();
         };
 
@@ -130,16 +130,11 @@
             BrowserService.InitiateOffer(connectionId);
         };
 
-        HubService.OnCallAborted += (action) =>
+        HubService.OnCallAborted += (message) =>
         {
-            var token = action switch
-            {
-                ServerAction.NoCredits => "due to insufficient credits",
-                ServerAction.Admin => "by server administrator",
-                _ => string.Empty
-            };
-
-            Layout.ShowPopup($"Session aborted {token}");
+            BrowserService.CloseConnection(message.User.ConnectionId);
+            Layout.ShowPopup(FormatServerAction(message.Action));
+            Reset();
         };
 
         BrowserService.OnLocalMediaAttached += (success) =>
@@ -213,7 +208,7 @@
         deviceAccessAlert = false;
     }
 
-    string FormatMessage(ActionMessage message)
+    string FormatUserAction(UserActionMessage message)
     {
         var token = message.Action switch
         {
@@ -226,6 +221,18 @@
         };
 
         return $"{message.User.Name} {token}";
+    }
+
+    string FormatServerAction(ServerAction action)
+    {
+        var token = action switch
+        {
+            ServerAction.NoCredits => "due to insufficient credits",
+            ServerAction.Admin => "by server administrator",
+            _ => string.Empty
+        };
+
+        return $"Session aborted {token}";
     }
 
     void Reset()
