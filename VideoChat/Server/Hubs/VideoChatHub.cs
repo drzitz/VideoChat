@@ -42,13 +42,6 @@ namespace VideoChat.Server.Hubs
 
         public List<UserCall> GetCalls() => UserCalls;
 
-        //public List<UserCall> GetCalls()
-        //{
-        //    var alex = Users.AsQueryable().FirstOrDefault(x => x.Id == 1);
-        //    var elena = Users.AsQueryable().FirstOrDefault(x => x.Id == 2);
-
-        //    return new List<UserCall> { new UserCall { Caller = alex, Callee = elena, Started = DateTime.UtcNow.AddHours(-1), Confirmed = DateTime.UtcNow } };
-        //}
 
         public void CallUser(string connectionId)
         {
@@ -64,6 +57,18 @@ namespace VideoChat.Server.Hubs
             if (GetUserCall(callee.ConnectionId) != null)
             {
                 SendCallDeclined(caller, callee, UserAction.Busy);
+                return;
+            }
+
+            if (!caller.CanChat)
+            {
+                SendCallDenied(caller, callee, ServerAction.NotAllowed, caller);
+                return;
+            }
+
+            if (!callee.CanChat)
+            {
+                SendCallDenied(caller, callee, ServerAction.NotAllowed, callee);
                 return;
             }
 
@@ -287,6 +292,10 @@ namespace VideoChat.Server.Hubs
             return Clients.Client(to.ConnectionId).CallDeclined(new UserActionMessage { User = from, Action = action }.ToJson());
         }
 
+        private Task SendCallDenied(User to, User from, ServerAction action, User target)
+        {
+            return Clients.Client(to.ConnectionId).CallDenied(new ServerActionMessage { User = from, ActionTarget = target, Action = action }.ToJson());
+        }
 
         private Task SendUsers()
         {
@@ -298,9 +307,9 @@ namespace VideoChat.Server.Hubs
             return Clients.All.UpdateCalls(UserCalls.ToJson());
         }
 
-        private Task SendCallAborted(User to, User from, ServerAction action)
+        private Task SendCallAborted(User to, User from, ServerAction action, User target = null)
         {
-            return Clients.Client(to.ConnectionId).CallAborted(new ServerActionMessage { User = from, Action = action }.ToJson());
+            return Clients.Client(to.ConnectionId).CallAborted(new ServerActionMessage { User = from, ActionTarget = target, Action = action }.ToJson());
         }
 
 

@@ -18,7 +18,7 @@
       "isMale": true,
       "isAdmin": false,
       "canChat": true,
-      "connectionId": null
+      "connectionId": "2xcqdFaZ3sb0NpOi789BHA"
     },
     {
       "id": 2,
@@ -27,8 +27,8 @@
       "balance": 0,
       "isMale": false,
       "isAdmin": false,
-      "canChat": true,
-      "connectionId": null
+      "canChat": false,
+      "connectionId": "vDkejPXmppRoajNDJiQWKw"
     }
   ]
 }

@@ -117,8 +117,8 @@
 </Modal>
 
 @code {
-    [Parameter]
-    public EventCallback<string> OnMessage { get; set; }
+    [CascadingParameter]
+    MainLayout Root { get; set; }
 
     Modal userEditModal;
 
@@ -172,7 +172,7 @@
 
         if (!result)
         {
-            _ = OnMessage.InvokeAsync("User update failed");
+            Root.ShowPopup("User update failed");
         }
     }
 

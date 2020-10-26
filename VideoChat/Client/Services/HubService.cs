@@ -18,6 +18,7 @@ namespace VideoChat.Client.Services
         public event Action<string> OnCallAccepted;
         public event Action<UserActionMessage> OnCallDeclined;
         public event Action<UserActionMessage> OnCallEnded;
+        public event Action<ServerActionMessage> OnCallDenied;
         public event Action<string, string> OnSignalReceived;
 
         public event Action<ServerActionMessage> OnCallAborted;
@@ -85,6 +86,11 @@ namespace VideoChat.Client.Services
             _hubConnection.On<string>("CallEnded", (message) =>
             {
                 OnCallEnded?.Invoke(message.FromJson<UserActionMessage>());
+            });
+
+            _hubConnection.On<string>("CallDenied", (message) =>
+            {
+                OnCallDenied?.Invoke(message.FromJson<ServerActionMessage>());
             });
 
             _hubConnection.On<string, string>("ReceiveSignal", (connectionId, data) =>

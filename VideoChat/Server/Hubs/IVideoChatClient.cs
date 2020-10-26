@@ -7,6 +7,7 @@ namespace VideoChat.Server.Hubs
         Task UpdateOnlineUsers(string users);
         Task CallAccepted(string connectionId);
         Task CallDeclined(string message);
+        Task CallDenied(string message);
         Task CallEnded(string message);
         Task IncomingCall(string connectionId);
         Task ReceiveSignal(string connectionId, string data);

@@ -40,7 +40,7 @@
                     {
                         <div>
                             <Icon Name="IconName.User" Margin="Margin.Is1"></Icon> @user.Name
-                            @if (user != Layout.Me)
+                            @if (user != Root.Me)
                             {
                                 if (state == State.Calling || state == State.InCall)
                                 {
@@ -81,7 +81,7 @@
 
 @code {
     [CascadingParameter]
-    MainLayout Layout { get; set; }
+    MainLayout Root { get; set; }
 
     Modal incomingCallModal;
     User caller, callee;
@@ -101,7 +101,7 @@
 
         HubService.OnCallDeclined += (message) =>
         {
-            Layout.ShowPopup(FormatUserAction(message));
+            Root.ShowPopup(FormatUserAction(message));
             Reset();
         };
 
@@ -109,7 +109,14 @@
         {
             incomingCallModal.Hide();
             BrowserService.CloseConnection(message.User.ConnectionId);
-            Layout.ShowPopup(FormatUserAction(message));
+            Root.ShowPopup(FormatUserAction(message));
+            Reset();
+        };
+
+        HubService.OnCallDenied += (message) =>
+        {
+            BrowserService.CloseConnection(message.User.ConnectionId);
+            Root.ShowPopup(FormatServerAction(message));
             Reset();
         };
 
@@ -133,7 +140,7 @@
         HubService.OnCallAborted += (message) =>
         {
             BrowserService.CloseConnection(message.User.ConnectionId);
-            Layout.ShowPopup(FormatServerAction(message.Action));
+            Root.ShowPopup(FormatServerAction(message));
             Reset();
         };
 
@@ -198,7 +205,7 @@
         await HubService.AnswerCall(false, caller.ConnectionId);
 
         incomingCallModal.Hide();
-        Layout.ShowPopup("Call declined");
+        Root.ShowPopup("Call declined");
     }
 
     void ShowError(string message)
@@ -223,16 +230,16 @@
         return $"{message.User.Name} {token}";
     }
 
-    string FormatServerAction(ServerAction action)
+    string FormatServerAction(ServerActionMessage message)
     {
-        var token = action switch
+        return message.Action switch
         {
-            ServerAction.NoCredits => "due to insufficient credits",
-            ServerAction.Admin => "by server administrator",
-            _ => string.Empty
+            ServerAction.NotAllowed => message.ActionTarget == Root.Me ? "You are not allowed to chat" : $"{message.ActionTarget.Name} is not allowed to chat",
+            ServerAction.NotEnoughCredits => message.ActionTarget == Root.Me ? "You do not have enough credits to chat" : $"{message.ActionTarget.Name} does not have enough credits to chat",
+            ServerAction.CreditsRanOut => message.ActionTarget == Root.Me ? "Session aborted because you run out of credits" : $"Session aborted because {message.ActionTarget.Name} ran out of credits",
+            ServerAction.Admin => "Session aborted by server administrator",
+            _ => message.Action.ToString()
         };
-
-        return $"Session aborted {token}";
     }
 
     void Reset()

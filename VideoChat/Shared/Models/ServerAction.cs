@@ -2,7 +2,9 @@
 {
     public enum ServerAction
     {
-        NoCredits,
+        NotEnoughCredits,
+        CreditsRanOut,
+        NotAllowed,
         Admin
     }
 }

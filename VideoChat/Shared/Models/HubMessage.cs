@@ -13,6 +13,7 @@
     public class ServerActionMessage : HubMessage
     {
         public ServerAction Action { get; set; }
+        public User ActionTarget { get; set; }
     }
 
     public class SignalMessage : HubMessage
