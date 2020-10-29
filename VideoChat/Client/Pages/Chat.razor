@@ -6,7 +6,7 @@
     <ModalBackdrop />
     <ModalContent Centered="true">
         <ModalBody>
-            User @caller?.Name is calling you. Do you want to accept the call?
+            User @partner?.Name is calling you. Do you want to accept the call?
         </ModalBody>
         <ModalFooter>
             <Button Color="Color.Secondary" Clicked="DeclineCall">Decline</Button>
@@ -84,18 +84,26 @@
     MainLayout Root { get; set; }
 
     Modal incomingCallModal;
-    User caller, callee;
+    User partner;
     State state;
     bool errorAlert;
     bool deviceAccessAlert = true;
     List<User> users = new List<User>();
     string errorMessage;
+    Timer timer;
+    string localStreamId;
 
     protected override async Task OnInitializedAsync()
     {
         HubService.OnOnlineUsersUpdated += (onlineUsers) =>
         {
             users = onlineUsers;
+            StateHasChanged();
+        };
+
+        HubService.OnBalanceUpdated += (balance) =>
+        {
+            Root.Me.Balance = balance;
             StateHasChanged();
         };
 
@@ -126,7 +134,7 @@
 
             if (user != null)
             {
-                caller = user;
+                partner = user;
                 incomingCallModal.Show();
             }
         };
@@ -144,11 +152,18 @@
             Reset();
         };
 
-        BrowserService.OnLocalMediaAttached += (success) =>
+        HubService.OnPoll += async (message) =>
+        {
+            var pollResult = await BrowserService.CheckState(message.User.ConnectionId, message.Poll.StreamId);
+            await HubService.AnswerPoll(message.Poll.Id, pollResult);
+        };
+
+        BrowserService.OnLocalMediaAttached += (success, streamId) =>
         {
             if (success)
             {
                 deviceAccessAlert = false;
+                localStreamId = streamId;
                 state = State.Idle;
             }
             else
@@ -171,6 +186,23 @@
             BrowserService.ProcessSignal(connectionId, data);
         };
 
+        BrowserService.OnConnectionStateChanged += (connectionId, state) =>
+        {
+            if (!Root.Me.IsMale)
+            {
+                if (state == PeerConnectionState.Connected)
+                {
+                    Console.WriteLine("App: Staring poll timer");
+                    StartTimer();
+                }
+                else if (state == PeerConnectionState.Disconnected || state == PeerConnectionState.Failed)
+                {
+                    Console.WriteLine("App: Stopping timer");
+                    StopTimer();
+                }
+            }
+        };
+
         users = await HubService.GetOnlineUsers();
 
         state = State.Loading;
@@ -180,7 +212,7 @@
     void Call(User user)
     {
         HubService.CallUser(user.ConnectionId);
-        callee = user;
+        partner = user;
         state = State.Calling;
     }
 
@@ -194,7 +226,7 @@
 
     async Task AcceptCall()
     {
-        await HubService.AnswerCall(true, caller.ConnectionId);
+        await HubService.AnswerCall(true, partner.ConnectionId);
 
         state = State.InCall;
         incomingCallModal.Hide();
@@ -202,10 +234,12 @@
 
     async Task DeclineCall()
     {
-        await HubService.AnswerCall(false, caller.ConnectionId);
+        await HubService.AnswerCall(false, partner.ConnectionId);
 
         incomingCallModal.Hide();
         Root.ShowPopup("Call declined");
+
+        Reset();
     }
 
     void ShowError(string message)
@@ -244,9 +278,29 @@
 
     void Reset()
     {
-        caller = null;
-        callee = null;
+        partner = null;
         state = State.Idle;
+        StopTimer();
         StateHasChanged();
+    }
+
+
+    void StartTimer()
+    {
+        timer = new Timer(state =>
+        {
+            if (partner != null)
+            {
+                Console.WriteLine("App: sending poll request");
+                HubService.RequestPoll(partner.ConnectionId, localStreamId);
+            }
+        },
+        null, 10000, 10000);
+    }
+
+    void StopTimer()
+    {
+        timer?.Dispose();
+        timer = null;
     }
 }

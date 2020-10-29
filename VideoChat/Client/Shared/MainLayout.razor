@@ -13,6 +13,13 @@
                 <BarEnd>
                     @if (Me != null)
                     {
+                        if (Me.IsMale)
+                        {
+                            <BarItem Padding="Padding.Is1.OnY.Is3.OnX">
+                                <Icon Name="IconName.MoneyBillAlt" Margin="Margin.Is1" />Balance: @Me.Balance
+                            </BarItem>
+                        }
+
                         <BarItem>
                             <Icon Name="IconName.User" Margin="Margin.Is1"></Icon>@Me.Name
                             <Button Margin="Margin.Is1" Size="ButtonSize.Small" Color="Color.Warning" Clicked="Logout">Logout</Button>

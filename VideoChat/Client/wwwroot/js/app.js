@@ -22,7 +22,7 @@ VideoChat.App = (function () {
 
                 _attachMedia('my-video', _mediaStream, true);
 
-                ref.invokeMethodAsync('AttachLocalMediaCallback', true);
+                ref.invokeMethodAsync('AttachLocalMediaCallback', true, _mediaStream.id);
             },
             function (error) {
                 ref.invokeMethodAsync('AttachLocalMediaCallback', false);
@@ -42,7 +42,7 @@ VideoChat.App = (function () {
     var _detachMedia = function (id) {
         var videoElement = document.getElementById(id);
 
-        if (videoElement.srcObject) {
+        if (videoElement && videoElement.srcObject) {
             videoElement.srcObject.getTracks().forEach(function (track) {
                 track.stop();
             });
@@ -65,6 +65,7 @@ VideoChat.App = (function () {
         };
 
         connection.onconnectionstatechange = function () {
+            _ref.invokeMethodAsync('ConnectionStateChangeCallback', connectionId, connection.connectionState);
             console.log('WebRTC: connection state changed to "' + connection.connectionState + '"');
         };
 
@@ -172,12 +173,29 @@ VideoChat.App = (function () {
         _detachMedia('my-video');
     };
 
+    var _checkState = function (connectionId, streamId) {
+        var connection = _connections[connectionId];
+
+        if (connection) {
+            console.log('CheckState: connection found ', connection);
+
+            var videoElement = document.getElementById('partner-video');
+            if (videoElement && videoElement.srcObject && videoElement.srcObject.id === streamId) {
+                console.log('CheckState: stream found ', stream);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     return {
         init: _init,
         initiateOffer: _initiateOffer,
         processSignal: _processSignal,
         closeConnection: _closeConnection,
         reset: _reset,
+        checkState: _checkState,
         connections: _connections
     };
 })();

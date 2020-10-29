@@ -13,8 +13,9 @@ namespace VideoChat.Client.Services
 
         private readonly DotNetObjectReference<BrowserService> objRef;
 
-        public event Action<bool> OnLocalMediaAttached;
+        public event Action<bool, string> OnLocalMediaAttached;
         public event Action<string, string> OnSendSignal;
+        public event Action<string, PeerConnectionState> OnConnectionStateChanged;
 
         public BrowserService(IJSRuntime jsRuntime, ILocalStorageService localStorage)
         {
@@ -64,16 +65,30 @@ namespace VideoChat.Client.Services
             return _jsRuntime.InvokeVoidAsync("VideoChat.App.reset");
         }
 
-        [JSInvokable]
-        public void AttachLocalMediaCallback(bool success)
+        public ValueTask<bool> CheckState(string connectionId, string streamId)
         {
-            OnLocalMediaAttached?.Invoke(success);
+            return _jsRuntime.InvokeAsync<bool>("VideoChat.App.checkState", connectionId, streamId);
+        }
+
+        [JSInvokable]
+        public void AttachLocalMediaCallback(bool success, string streamId)
+        {
+            OnLocalMediaAttached?.Invoke(success, streamId);
         }
 
         [JSInvokable]
         public void SendSignalCallback(string data, string connectionId)
         {
             OnSendSignal?.Invoke(data, connectionId);
+        }
+
+        [JSInvokable]
+        public void ConnectionStateChangeCallback(string connectionId, string state)
+        {
+            if (Enum.TryParse<PeerConnectionState>(state, true, out var connectionState))
+            {
+                OnConnectionStateChanged?.Invoke(connectionId, connectionState);
+            }
         }
     }
 }

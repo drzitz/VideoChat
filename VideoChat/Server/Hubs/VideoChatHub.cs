@@ -15,6 +15,7 @@ namespace VideoChat.Server.Hubs
 
         private static readonly List<UserCall> UserCalls = new List<UserCall>();
         private static readonly List<CallOffer> CallOffers = new List<CallOffer>();
+        private static readonly List<Poll> Polls = new List<Poll>();
 
         public async Task<User> Login(string userName, string password)
         {
@@ -69,6 +70,18 @@ namespace VideoChat.Server.Hubs
             if (!callee.CanChat)
             {
                 SendCallDenied(caller, callee, ServerAction.NotAllowed, callee);
+                return;
+            }
+
+            if (caller.IsMale && caller.Balance <= 0)
+            {
+                SendCallDenied(caller, callee, ServerAction.NotEnoughCredits, caller);
+                return;
+            }
+
+            if (callee.IsMale && callee.Balance <= 0)
+            {
+                SendCallDenied(caller, callee, ServerAction.NotEnoughCredits, callee);
                 return;
             }
 
@@ -169,6 +182,51 @@ namespace VideoChat.Server.Hubs
             SendOnlineUsers();
         }
 
+        public void RequestPoll(string connectionId, string streamId)
+        {
+            var poller = GetUser();
+            var pollee = GetUser(connectionId);
+
+            var poll = new Poll { Poller = poller, Pollee = pollee, StreamId = streamId };
+
+            Polls.Add(poll);
+
+            SendPoll(pollee, poller, poll);
+        }
+
+        public async Task AnswerPoll(string pollId, bool result)
+        {
+            var poll = Polls.FirstOrDefault(x => x.Id == pollId);
+
+            if (poll != null)
+            {
+                if (result)
+                {
+                    var pollee = Users.AsQueryable().FirstOrDefault(x => x == poll.Pollee);
+                    var poller = poll.Poller;
+
+                    if (pollee != null)
+                    {
+                        pollee.Balance -= 10;
+                        await Users.UpdateOneAsync(pollee.Id, pollee);
+                        await SendBalanceUpdated(pollee);
+
+                        if (pollee.Balance <= 0)
+                        {
+                            await SendCallAborted(pollee, poll.Poller, ServerAction.CreditsRanOut, pollee);
+                            await SendCallAborted(poller, poll.Pollee, ServerAction.CreditsRanOut, pollee);
+
+                            UserCalls.RemoveAll(x => (x.Callee == pollee && x.Caller == poller) || (x.Callee == poller && x.Caller == pollee));
+                            _ = SendCalls();
+                        }
+                    }
+                }
+
+                Polls.Remove(poll);
+            }
+        }
+
+
         public async Task Leave()
         {
             var user = GetUser();
@@ -216,6 +274,11 @@ namespace VideoChat.Server.Hubs
             {
                 Clients.Client(callee.ConnectionId).ReceiveSignal(caller.ConnectionId, signal);
             }
+        }
+
+        public Task SendPoll(User to, User from, Poll poll)
+        {
+            return Clients.Client(to.ConnectionId).Poll(new PollMessage { User = from, Poll = poll }.ToJson());
         }
 
 
@@ -280,6 +343,11 @@ namespace VideoChat.Server.Hubs
         private Task SendOnlineUsers()
         {
             return Clients.All.UpdateOnlineUsers(Users.AsQueryable().Where(x => !x.IsAdmin && x.IsOnline).ToJson());
+        }
+
+        private Task SendBalanceUpdated(User to)
+        {
+            return Clients.Client(to.ConnectionId).UpdateBalance(to.Balance);
         }
 
         private Task SendCallEnded(User to, User from, UserAction action)

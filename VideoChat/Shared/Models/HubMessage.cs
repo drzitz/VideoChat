@@ -20,4 +20,9 @@
     {
         public string Data { get; set; }
     }
+
+    public class PollMessage: HubMessage
+    {
+        public Poll Poll { get; set; }
+    }
 }

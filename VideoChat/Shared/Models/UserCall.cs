@@ -10,7 +10,7 @@ namespace VideoChat.Shared.Models
             Id = Guid.NewGuid().ToString();
         }
 
-        public string Id { get; set; }
+        public string Id { get; }
 
         public List<User> Users { get; set; }
 

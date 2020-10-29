@@ -14,11 +14,13 @@ namespace VideoChat.Client.Services
         private readonly NavigationManager _navigationManager;
 
         public event Action<List<User>> OnOnlineUsersUpdated;
+        public event Action<int> OnBalanceUpdated;
         public event Action<string> OnIncomingCall;
         public event Action<string> OnCallAccepted;
         public event Action<UserActionMessage> OnCallDeclined;
         public event Action<UserActionMessage> OnCallEnded;
         public event Action<ServerActionMessage> OnCallDenied;
+        public event Action<PollMessage> OnPoll;
         public event Action<string, string> OnSignalReceived;
 
         public event Action<ServerActionMessage> OnCallAborted;
@@ -68,6 +70,11 @@ namespace VideoChat.Client.Services
                 OnOnlineUsersUpdated?.Invoke(message.FromJson<List<User>>());
             });
 
+            _hubConnection.On<int>("UpdateBalance", (balance) =>
+            {
+                OnBalanceUpdated?.Invoke(balance);
+            });
+
             _hubConnection.On<string>("IncomingCall", (connectionId) =>
             {
                 OnIncomingCall?.Invoke(connectionId);
@@ -93,12 +100,17 @@ namespace VideoChat.Client.Services
                 OnCallDenied?.Invoke(message.FromJson<ServerActionMessage>());
             });
 
+            _hubConnection.On<string>("Poll", (message) =>
+            {
+                OnPoll?.Invoke(message.FromJson<PollMessage>());
+            });
+
             _hubConnection.On<string, string>("ReceiveSignal", (connectionId, data) =>
             {
                 OnSignalReceived?.Invoke(connectionId, data);
             });
 
-
+            
             _hubConnection.On<string>("UpdateUsers", (message) =>
             {
                 OnUsersUpdated?.Invoke(message.FromJson<List<User>>());
@@ -158,6 +170,16 @@ namespace VideoChat.Client.Services
         public Task SendSignal(string signal, string connectionId)
         {
             return _hubConnection.SendAsync("SendSignal", signal, connectionId);
+        }
+
+        public Task RequestPoll(string connectionId, string streamId)
+        {
+            return _hubConnection.SendAsync("RequestPoll", connectionId, streamId);
+        }
+
+        public Task AnswerPoll(string pollId, bool result)
+        {
+            return _hubConnection.SendAsync("AnswerPoll", pollId, result);
         }
 
         public Task AbortCall(string callId)
